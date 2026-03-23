@@ -32,6 +32,8 @@ def main() -> None:
     scan_p.add_argument("url", help="Public URL to analyse")
     scan_p.add_argument("--alias", default="llm",
                         help="Leafhub alias to use (default: llm)")
+    scan_p.add_argument("--no-pdf", action="store_true",
+                        help="Skip PDF generation (only produce report.md)")
 
     # setup
     sub.add_parser("setup", help="Verify and repair Leafhub credential binding")
@@ -44,7 +46,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.cmd == "scan":
-        _cmd_scan(args.url, alias=args.alias)
+        _cmd_scan(args.url, alias=args.alias, pdf=not args.no_pdf)
     elif args.cmd == "setup":
         _cmd_setup()
     elif args.cmd == "clean":
@@ -89,10 +91,10 @@ def _cmd_clean(yes: bool = False) -> None:
 
 # ── scan ──────────────────────────────────────────────────────────────────────
 
-def _cmd_scan(url: str, alias: str = "llm") -> None:
+def _cmd_scan(url: str, alias: str = "llm", pdf: bool = True) -> None:
     from .pipeline import run
     try:
-        report_path = run(url, alias=alias)
+        report_path = run(url, alias=alias, pdf=pdf)
         print(f"\nReport saved to: {report_path}")
     except KeyboardInterrupt:
         print("\nInterrupted.")

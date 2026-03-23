@@ -1,8 +1,8 @@
 # LeafScan
 
-**LeafScan** extracts the design DNA from any public webpage. Give it a URL, get back a structured design report covering typography, color system, animation, layout strategy, and third-party dependencies.
+**LeafScan** extracts the design DNA from any public webpage. Give it a URL, get back a structured design report covering typography, color system, animation, layout strategy, third-party dependencies, and a full **architecture reproduction blueprint**.
 
-It uses a headless browser to render the page, scrolls through to trigger lazy-loaded content and animations, extracts CSS data from the live DOM, and sends both the structured data and viewport screenshots to an LLM for analysis.
+It uses a headless browser to render the page, scrolls through to trigger lazy-loaded content and animations, extracts CSS data from the live DOM, detects frontend frameworks and media elements, and sends both the structured data and viewport screenshots to an LLM for analysis. Reports are generated in both **Markdown** and **PDF** formats.
 
 ---
 
@@ -19,153 +19,44 @@ The following report was generated automatically by running `leafscan scan https
 <details>
 <summary><b>Full generated report (click to expand)</b></summary>
 
+<!-- auto-generated from outputs/linear.app_20260323_214857/report.md -->
+
 ### 1. Font System
-- **Primary font family and source**
-  - Data shows: primary UI font is `"Inter Variable", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif`.
-  - Data shows: loaded font faces include `Inter Variable` with weight range `100 900`.
-  - Data shows: no Google Fonts, Typekit, or other font services were detected.
-  - Interpretation: `Inter Variable` appears to be self-hosted or bundled via the app rather than loaded from a third-party font CDN.
-
-- **Heading weight(s), body weight(s)**
-  - Data shows:
-    - `h1`: `fontWeight: 510`
-    - `h2`: `fontWeight: 510`
-    - `[class*="heading"]`: `fontWeight: 510`
-    - `h3`: `fontWeight: 590`
-    - `body`: `fontWeight: 400`
-    - `p`: `fontWeight: 400`
-    - `a`: `fontWeight: 510`
-    - `button`: `fontWeight: 400`
-  - Interpretation: the system uses nuanced variable-font weights rather than standard 500/600/700 steps.
-
-- **Base font size and line height**
-  - Data shows:
-    - `body`: `fontSize: 16px`, `lineHeight: 24px`
-    - `p`: `fontSize: 15px`, `lineHeight: 24px`
-  - Interpretation: body rhythm is relatively spacious, with a 1.5 line-height baseline.
-
-- **Any variable font usage**
-  - Data shows:
-    - `Inter Variable` loaded with `weight: "100 900"`
-    - `Berkeley Mono` loaded with `weight: "100 900"`
-    - non-standard computed weights such as `510` and `590`
-  - Interpretation: yes, variable font capabilities are actively used.
-
-- **Notable typographic decisions**
-  - Data shows:
-    - `h1`: `64px / 64px`, `letterSpacing: -1.408px`
-    - `h2`: `48px / 48px`, `letterSpacing: -1.056px`
-    - `[class*="heading"]`: `72px / 72px`, `letterSpacing: -1.584px`
-    - `p`: `letterSpacing: -0.165px`
-    - `h3`: `letterSpacing: -0.24px`
-    - `Berkeley Mono` is loaded.
-  - Interpretation:
-    - Tight line heights and negative tracking create a crisp, dense display style.
-    - The mono face is likely used selectively for product UI/code-like content shown in the screenshots.
-    - The typography feels precision-tuned for a premium SaaS/product audience.
+- **Data shows:** The primary font is `"Inter Variable"` with fallbacks `"SF Pro Display", -apple-system, ... sans-serif`.
+- **Data shows:** `Inter Variable` is loaded with a weight range of `"100 900"`, indicating variable font usage.
+- **Data shows:** `Berkeley Mono` is also loaded with weight range `"100 900"`.
+- **Data shows:** Body text uses `fontSize: 16px`, `fontWeight: 400`, `lineHeight: 24px`.
+- **Data shows:** `h1` uses `fontSize: 64px`, `fontWeight: 510`, `letterSpacing: -1.408px`.
+- **Data shows:** `[class*="heading"]` reaches `fontSize: 72px`, `fontWeight: 510`.
+- **Data shows:** No Google Fonts, Typekit, or external font service was detected.
+- **Interpretation:** Variable-weight midpoints like `510` and `590` give headings a refined, slightly denser feel than standard steps.
 
 ### 2. Color System
-- **Primary brand color**
-  - Data shows:
-    - `a`: `backgroundColor: rgb(94, 106, 210)` = `#5E6AD2`
-  - Interpretation: `#5E6AD2` is the clearest brand/accent color surfaced in computed styles.
-
-- **Background color(s)**
-  - Data shows:
-    - `body`: `backgroundColor: rgb(8, 9, 10)` = `#08090A`
-    - `footer`: `backgroundColor: rgb(8, 9, 10)` = `#08090A`
-  - Interpretation: the site is built on a near-black canvas with subtle tonal variation visible in screenshots.
-
-- **Text color(s)**
-  - Data shows:
-    - `body`: `rgb(247, 248, 248)` = `#F7F8F8`
-    - `h1`: `rgb(247, 248, 248)` = `#F7F8F8`
-    - `h2`: `rgb(138, 143, 152)` = `#8A8F98`
-    - `p`: `rgb(138, 143, 152)` = `#8A8F98`
-    - `h3`: `rgb(208, 214, 224)` = `#D0D6E0`
-    - `a`: `rgb(255, 255, 255)` = `#FFFFFF`
-  - Interpretation: the palette uses strong contrast hierarchy: bright white for primary headlines, muted gray for body copy, and cooler light gray for tertiary headings.
-
-- **Accent / highlight colors**
-  - Data shows:
-    - primary accent visible in computed styles: `#5E6AD2`
-  - Interpretation:
-    - Screenshots also show occasional warm/yellow and red/orange status accents inside product imagery, but those are visual observations rather than extracted system colors.
-    - The main site chrome remains restrained, with accent color used sparingly.
-
-- **Whether dark mode is present**
-  - Data shows:
-    - dark backgrounds dominate computed styles
-    - no `prefers-color-scheme` data provided
-    - no color CSS custom properties or dark-mode tokens were extracted
-  - Interpretation: the current page is clearly dark-themed, but the provided data does not confirm a separate dark/light mode switch.
-
-- **CSS custom property tokens related to color**
-  - Data shows:
-    - `css_vars: {}`
-  - Interpretation: no color tokens were captured in the extraction, so token naming conventions cannot be documented from the provided data.
+- **Data shows:** Body/background: `#08090A`. Primary text: `#F7F8F8`. Secondary: `#8A8F98`.
+- **Data shows:** Brand accent: `#5E6AD2` (link backgrounds).
+- **Interpretation:** Restrained dark theme with layered grays and a violet accent used sparingly.
 
 ### 3. Animation & Motion
-- **JS animation libraries detected and how they are loaded**
-  - Data shows:
-    - `animation_libraries: []`
-    - `detected_libraries: []`
-    - scripts are loaded from bundled Next.js chunks on `static.linear.app`
-  - Interpretation: there is no evidence of GSAP, Framer Motion, AOS, or similar third-party animation libraries in the provided data; motion may be custom/CSS-driven and bundled.
-
-- **@keyframes rules found**
-  - Data shows:
-    - a very large set of keyframes named like:
-      - `grid-dot-*-*-agent`
-      - `grid-dot-*-*-upDown`
-      - `grid-dot-*-*-pong`
-      - `grid-dot-*-*-empty-once`
-    - these primarily animate `opacity`
-    - additional keyframes:
-      - `swipe-out-left/right/up/down`
-      - `sonner-fade-in`, `sonner-fade-out`, `sonner-spin`
-  - Interpretation:
-    - the `grid-dot-*` animations likely drive decorative or illustrative dot-matrix/product-demo motion patterns.
-    - `swipe-out-*` animate transform + opacity for dismiss/motion exits.
-    - `sonner-*` are consistent with toast/notification UI animations.
-
-- **Transition patterns**
-  - Data shows transitions:
-    - `transform 0.4s`
-    - `transform 0.4s, opacity 0.4s, height 0.4s, box-shadow 0.2s`
-    - `opacity 0.4s, box-shadow 0.2s`
-    - `opacity 0.1s, background 0.2s, border-color 0.2s`
-  - Interpretation:
-    - dominant durations cluster around `0.2s–0.4s`.
-    - this suggests a polished but controlled motion system emphasizing fades and gentle movement.
-
-- **Scroll-triggered animation indicators**
-  - Data shows: no ScrollTrigger, AOS, or other animation library detection.
-  - Interpretation: scroll-linked behavior is visually suggested by the page's progressive product sections, but the provided technical data does not confirm the implementation.
-
-- **Overall motion character**: **moderate** — rich and intentional, but not flashy.
+- **Data shows:** No JS animation libraries detected. Hundreds of `grid-dot-*` keyframes animate opacity. Transitions cluster around `0.2s–0.4s`.
+- **Interpretation:** Motion is moderate — polished and CSS-driven, not library-dependent.
 
 ### 4. Layout Strategy
-- **Top-level layout approach**
-  - Data shows:
-    - `main`: `display: flex`, `flexDirection: column`
-    - `nav`: `display: flex`, `alignItems: center`
-    - `[class*="container"]`: `display: flex`, `flexDirection: column`
-  - Interpretation: primarily Flexbox-driven top-level structure.
-
-- **Notable layout patterns** (from screenshots):
-  - persistent top navigation/header across scroll frames
-  - repeated split-layout sections with large headline left / supporting copy right
-  - full-bleed dark sections with embedded product panels
-  - footer uses a multi-column link layout
+- **Data shows:** Flexbox-dominant (`main`, `nav`, `[class*="container"]`). Persistent header, split hero/content rows, product showcase cards, multi-column footer.
 
 ### 5. Third-Party Dependencies
-- **Font services**: none detected
-- **CDN-loaded scripts**: Next.js bundled chunks from `static.linear.app`
-- **Notable external origins**: `api.linear.app`, `constellation.linear.app`, `e.linear.app`, `static.linear.app`, `webassets.linear.app`
+- **Data shows:** Next.js bundled chunks from `static.linear.app`. Detected: Next.js framework, Webpack build tool.
+- **Data shows:** External origins: `api.linear.app`, `constellation.linear.app`, `static.linear.app`, `webassets.linear.app`.
 
 ### 6. Design Style Summary
-The design language is highly refined, minimal, and technical — closer to a premium product brand than a marketing-heavy SaaS site. The near-black palette, precise variable-font weights, tight display typography, and restrained violet accent create a calm, confident mood aimed at design-conscious product and engineering teams. The most distinctive decision is the fusion of austere editorial layout with dense, animated product visuals, which makes the interface itself feel like the brand.
+Premium, high-discipline SaaS aesthetic: dark, quiet, product-first. The brand turns real product UI into the visual system itself.
+
+### 7. Architecture & Reproduction Blueprint
+- **Detected:** Next.js + Webpack, no CSS framework explicitly detected
+- **Recommended stack:** React + Next.js, CSS Modules + design tokens, minimal global state
+- **Component breakdown:** ~25–40 unique components including `<HeroSection>`, `<StorySection>`, `<ProductShowcasePanel>`, `<ChangelogSection>`, `<Footer>`
+- **Media:** No video, canvas, WebGL, or iframe embeds — product mockups are DOM/image-based
+- **Complexity:** High — challenges include dark-theme contrast discipline, responsive product mockups, and sequenced dot/grid animations
+- **Build priority:** foundations → hero + story sections → product showcase panels → changelog → motion polish
 
 </details>
 
@@ -215,6 +106,7 @@ curl -fsSL https://raw.githubusercontent.com/Rebas9512/Leafscan/main/install.cmd
 
 The installer clones the repo, creates an isolated virtual environment, installs Playwright + Chromium, and registers the `leafscan` command on your PATH.
 
+
 ---
 
 ## Configure
@@ -250,17 +142,21 @@ leafscan scan https://linear.app
 
 # Use a specific model alias
 leafscan scan https://linear.app --alias minimax
+
+# Skip PDF generation (Markdown only)
+leafscan scan https://linear.app --no-pdf
 ```
 
 Output is saved to `outputs/{domain}_{timestamp}/`:
 
 ```
-outputs/linear.app_20260323_014056/
+outputs/linear.app_20260323_214857/
 ├── frame_01.png ~ frame_12.png   # Scroll-captured viewport screenshots
 ├── css.json                       # Raw CSS extraction data
 ├── network.json                   # Network request log
 ├── assets.json                    # Aggregated libraries, fonts, CDN origins
-└── report.md                      # LLM-generated design analysis report
+├── report.md                      # LLM-generated design analysis report
+└── report.pdf                     # PDF version of the report (optional)
 ```
 
 ---
@@ -269,8 +165,9 @@ outputs/linear.app_20260323_014056/
 
 | Command | What it does |
 |---------|-------------|
-| `leafscan scan <url>` | Scan a URL and generate a design report |
+| `leafscan scan <url>` | Scan a URL and generate a design report (MD + PDF) |
 | `leafscan scan <url> --alias <name>` | Scan using a specific LeafHub model alias |
+| `leafscan scan <url> --no-pdf` | Scan without generating the PDF report |
 | `leafscan setup` | Verify and repair LeafHub credential binding |
 | `leafscan clean` | Remove all generated outputs |
 | `leafscan clean -y` | Remove outputs without confirmation |
@@ -301,8 +198,10 @@ URL
 └──────────────────┬───────────────────────────┘
                    │  produces
              ┌─────┴──────┐
-             │ css.json   │  fonts, colors, keyframes, transitions, layout
-             │ assets.json│  detected libraries, font services, CDN origins
+             │ css.json   │  fonts, colors, keyframes, transitions, layout,
+             │            │  detected frameworks, media elements
+             │ assets.json│  detected libraries, font services, CDN origins,
+             │            │  frameworks, build tools, media summary
              │ frame_*.png│  scroll-captured viewport screenshots
              └─────┬──────┘
                    │
@@ -310,20 +209,29 @@ URL
 ┌──────────────────────────────────────────────┐
 │  Step 3: Aggregate                           │
 │  Merge network data + extractor output.      │
-│  Identify bundled libraries from CDN URLs    │
-│  and global variables.                       │
+│  Identify libraries, frameworks, build tools │
+│  from CDN URLs, global variables, and DOM.   │
 └──────────────────┬───────────────────────────┘
                    │
                    ▼
 ┌──────────────────────────────────────────────┐
 │  Step 4: LLM Report                          │
 │  Sample ≤8 key frames from the scroll,       │
-│  send structured CSS data + screenshots to   │
-│  the LLM, receive Markdown design report.    │
+│  send structured CSS data + architecture     │
+│  signals + screenshots to the LLM.           │
+│  Receive Markdown design report with         │
+│  architecture reproduction blueprint.        │
 │                                              │
 │  Adapts automatically:                       │
 │    vision model → screenshots + data         │
 │    text-only model → data only               │
+└──────────────────┬───────────────────────────┘
+                   │
+                   ▼
+┌──────────────────────────────────────────────┐
+│  Step 5: PDF Export (optional)               │
+│  Convert Markdown report to styled PDF.      │
+│  Skip with --no-pdf or if deps not installed.│
 └──────────────────────────────────────────────┘
 ```
 
@@ -346,7 +254,10 @@ At pipeline start, a small test image is sent to the model. If accepted → visi
 
 | Site | Type | Frames | Key findings |
 |------|------|--------|-------------|
-| linear.app | SaaS landing page | 12 | Inter Variable, 607 keyframes, custom grid-dot animations |
+| linear.app | SaaS landing page | 12 | Next.js + Webpack detected, Inter Variable, 607 keyframes, grid-dot animations |
+| giellygreen.co.uk | Luxury beauty e-commerce | 12 | Vue + Nuxt detected, Prismic CMS + Shopify, Swiper, self-hosted fonts |
+| nippori.lamm.tokyo | Editorial podcast site | 18 | WordPress + Remix detected, 7 self-hosted videos, Typekit + Google Fonts |
+| ironhill.au | Premium brand microsite | 19 | Vue + Nuxt detected, WebGL2 canvas, 3 autoplay videos, self-hosted fonts |
 | memorial.fcporto.pt | Video / narrative memorial | 30 | GSAP + ScrollTrigger + Lenis (bundled), Astro build |
 | good-fella.com | Creative studio portfolio | 9 | Typekit fonts, 12-column grid, Next.js/Turbopack |
 | d2c-lifescience.com | 3D life science | 30 | Custom 3D rendering, Prismic CMS, Astro build |
@@ -366,7 +277,8 @@ Leafscan/
 │   ├── extractor.py      # Browser-side JS extraction + Python parser
 │   ├── aggregator.py     # Library detection, font service matching, data merge
 │   ├── reporter.py       # LLM call with api_format adapters
-│   ├── pipeline.py       # Orchestration: probe → scrape → aggregate → report
+│   ├── pdf.py            # Markdown → PDF conversion (optional deps)
+│   ├── pipeline.py       # Orchestration: probe → scrape → aggregate → report → PDF
 │   └── cli.py            # CLI entry point
 │
 ├── prompts/
@@ -376,8 +288,9 @@ Leafscan/
 │   ├── smoke_e2e.py      # End-to-end smoke test
 │   ├── test_model.py     # Capability probe tests
 │   ├── test_reporter.py  # Payload builder + API adapter tests
-│   ├── test_aggregator.py# Library / font detection tests
-│   └── test_extractor.py # CSS data parser tests
+│   ├── test_aggregator.py# Library / font / framework detection tests
+│   ├── test_extractor.py # CSS data parser tests
+│   └── test_pdf.py       # PDF converter tests
 │
 ├── outputs/              # Generated reports (git-ignored)
 ├── leafhub_dist/         # LeafHub integration module (auto-generated)

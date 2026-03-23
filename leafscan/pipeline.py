@@ -20,6 +20,7 @@ from urllib.parse import urlparse
 
 from .aggregator import aggregate
 from .model      import Cap, ResolvedModel, probe_caps, resolve
+from .pdf        import md_to_pdf
 from .reporter   import generate_report
 from .scraper    import scrape
 
@@ -27,7 +28,7 @@ _PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 _OUTPUTS_DIR = Path(__file__).parent.parent / "outputs"
 
 
-def run(url: str, alias: str = "llm") -> Path:
+def run(url: str, alias: str = "llm", *, pdf: bool = True) -> Path:
     """
     Full pipeline: URL in, report.md out.
     Returns the path to the generated report file.
@@ -75,6 +76,12 @@ def run(url: str, alias: str = "llm") -> Path:
 
     report_path = output_dir / "report.md"
     report_path.write_text(report_final, encoding="utf-8")
+
+    # ── PDF generation ──────────────────────────────────────────────────────
+    if pdf:
+        print("[leafscan] Generating PDF ...", flush=True)
+        pdf_path = md_to_pdf(report_final, output_dir / "report.pdf")
+        print(f"[leafscan] PDF saved -> {pdf_path}", flush=True)
 
     print(f"\n[leafscan] Done in {elapsed:.1f}s -> {report_path}", flush=True)
     return report_path

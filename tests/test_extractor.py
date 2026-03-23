@@ -69,3 +69,29 @@ class TestParseRaw:
         raw = {"keyframes": [{"name": "fadeIn", "cssText": "@keyframes fadeIn { ... }"}]}
         result = parse_raw(raw)
         assert result["keyframes"][0]["name"] == "fadeIn"
+
+    def test_frameworks_passthrough(self):
+        raw = {"frameworks": ["React", "Next.js"]}
+        result = parse_raw(raw)
+        assert result["frameworks"] == ["React", "Next.js"]
+
+    def test_frameworks_empty_default(self):
+        result = parse_raw({})
+        assert result["frameworks"] == []
+
+    def test_media_passthrough(self):
+        raw = {"media": {
+            "video": [{"src": "bg.mp4", "autoplay": True}],
+            "canvas": [{"width": 1440, "height": 900, "context": "webgl2"}],
+            "webgl": True,
+            "iframe_embeds": [{"service": "YouTube", "src": "https://youtube.com/embed/x"}],
+        }}
+        result = parse_raw(raw)
+        assert result["media"]["webgl"] is True
+        assert len(result["media"]["video"]) == 1
+        assert result["media"]["canvas"][0]["context"] == "webgl2"
+        assert result["media"]["iframe_embeds"][0]["service"] == "YouTube"
+
+    def test_media_empty_default(self):
+        result = parse_raw({})
+        assert result["media"] == {}

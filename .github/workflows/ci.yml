@@ -37,7 +37,7 @@ jobs:
         run: python -m playwright install chromium
 
       - name: Run unit tests
-        run: python -m pytest tests/test_model.py tests/test_reporter.py tests/test_aggregator.py tests/test_extractor.py -v
+        run: python -m pytest tests/test_model.py tests/test_reporter.py tests/test_aggregator.py tests/test_extractor.py tests/test_pdf.py -v
 
   lint:
     name: Lint & syntax checks

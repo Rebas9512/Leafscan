@@ -59,9 +59,17 @@ def _build_user_content(
       Each image is one viewport "fold" captured during scroll.
     Text-only mode: [text_block]  (with a note explaining no screenshots)
     """
+    # Separate architecture signals for clearer prompt structure
+    arch_data = {
+        k: assets_data[k]
+        for k in ("detected_frameworks", "build_tools", "media")
+        if k in assets_data
+    }
+
     data_text = (
         f"## CSS & Typography\n```json\n{json.dumps(css_data, indent=2)}\n```\n\n"
-        f"## Assets & Libraries\n```json\n{json.dumps(assets_data, indent=2)}\n```"
+        f"## Assets & Libraries\n```json\n{json.dumps(assets_data, indent=2)}\n```\n\n"
+        f"## Architecture Signals\n```json\n{json.dumps(arch_data, indent=2)}\n```"
     )
 
     if Cap.VISION not in caps:
@@ -128,7 +136,7 @@ def _sample_frames(paths: list[Path], max_frames: int = 8) -> list[Path]:
 def _call_anthropic(model: ResolvedModel, system_prompt: str, user_content: list) -> str:
     resp = model.client.messages.create(
         model=model.model,
-        max_tokens=4096,
+        max_tokens=8192,
         system=system_prompt,
         messages=[{"role": "user", "content": user_content}],
     )
@@ -146,7 +154,7 @@ def _call_anthropic(model: ResolvedModel, system_prompt: str, user_content: list
 def _call_openai(model: ResolvedModel, system_prompt: str, user_content: list) -> str:
     resp = model.client.chat.completions.create(
         model=model.model,
-        max_tokens=4096,
+        max_tokens=8192,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": _to_openai_blocks(user_content)},

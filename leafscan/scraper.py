@@ -80,6 +80,13 @@ async def _scrape_async(url: str, output_dir: Path) -> ScrapeResult:
         # ── Scroll-and-capture ────────────────────────────────────────────
         screenshot_paths = await _scroll_and_capture(page, output_dir)
 
+        # ── Retry cookie dismiss after scroll (late-appearing banners) ───
+        # Some banners only appear after scroll or a JS timer.  If one is
+        # still visible, click it now and re-take the last captured frame
+        # so the final screenshots are clean.
+        if await _try_dismiss_late_banner(page, screenshot_paths):
+            log.debug("Late cookie banner dismissed after scroll")
+
         # ── Extract CSS data AFTER full scroll (DOM is now fully rendered) ─
         raw      = await page.evaluate(EXTRACT_SCRIPT)
         css_data = parse_raw(raw)
@@ -98,12 +105,13 @@ async def _scrape_async(url: str, output_dir: Path) -> ScrapeResult:
 # Common selectors for cookie consent "accept" buttons, ordered by specificity.
 # Each entry is (selector, description) for debugging.
 _CONSENT_SELECTORS = [
-    # Generic buttons by text content
+    # Generic buttons by text content (button element)
     'button:has-text("Accept All")',
     'button:has-text("Accept all")',
     'button:has-text("Accept")',
     'button:has-text("I agree")',
     'button:has-text("Got it")',
+    'button:has-text("Got It")',
     'button:has-text("OK")',
     'button:has-text("Agree")',
     'button:has-text("Allow all")',
@@ -111,6 +119,19 @@ _CONSENT_SELECTORS = [
     'button:has-text("Consent")',
     'button:has-text("Continue")',
     'button:has-text("Decline Non-Required")',
+    # Same patterns but for <a> / <div> / <span> (many banners use non-button elements)
+    'a:has-text("Accept All")',
+    'a:has-text("Accept all")',
+    'a:has-text("Accept")',
+    'a:has-text("Got it")',
+    'a:has-text("Got It")',
+    'a:has-text("OK")',
+    'a:has-text("I agree")',
+    'a:has-text("Agree and Proceed")',
+    'a:has-text("Allow all")',
+    '[role="button"]:has-text("Accept")',
+    '[role="button"]:has-text("Got it")',
+    '[role="button"]:has-text("OK")',
     # Common IDs and classes
     '#onetrust-accept-btn-handler',
     '#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll',
@@ -118,11 +139,21 @@ _CONSENT_SELECTORS = [
     '.cookie-accept',
     '.cc-accept',
     '.cc-allow',
+    '.cc-dismiss',
+    '.cc-btn',
     '.js-cookie-accept',
-    # TrustArc (used by cornrevolution)
+    '.cookie-notice__button',
+    '.cookie-consent-accept',
+    '[data-cookie-accept]',
+    '[data-action="accept-cookies"]',
+    # CookieConsent (GDPR Cookie Consent plugin)
+    '#cookie_action_close_header',
+    '.cli-plugin-button',
+    # Complianz
+    '#cmplz-cookiebanner-container .cmplz-accept',
+    # TrustArc
     '.call[tabindex="0"]',
     '#truste-consent-button',
-    'a:has-text("Agree and Proceed")',
 ]
 
 
@@ -146,6 +177,31 @@ async def _dismiss_cookie_banner(page: Page) -> None:
                 return
         except Exception:
             continue
+
+
+async def _try_dismiss_late_banner(page: Page, screenshot_paths: list[Path]) -> bool:
+    """
+    Retry cookie dismissal after scrolling — catches banners that appear
+    on a delay or after scroll. If dismissed, re-capture the last frame
+    so screenshots are clean.
+    """
+    dismissed = await _try_click_consent(page)
+    if not dismissed:
+        for frame in page.frames[1:]:
+            try:
+                dismissed = await _try_click_consent(frame)
+                if dismissed:
+                    break
+            except Exception:
+                continue
+
+    if dismissed and screenshot_paths:
+        await asyncio.sleep(0.5)
+        # Re-take the last frame without the banner
+        last = screenshot_paths[-1]
+        await page.screenshot(path=str(last))
+
+    return dismissed
 
 
 async def _try_click_consent(target) -> bool:

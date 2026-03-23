@@ -10,6 +10,8 @@ dependencies = [
     "playwright>=1.43",
     "anthropic>=0.25",
     "openai>=1.30",
+    "markdown>=3.6",
+    "weasyprint>=62",
 ]
 
 [project.optional-dependencies]

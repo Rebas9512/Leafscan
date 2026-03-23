@@ -1,7 +1,13 @@
 """Tests for leafscan.aggregator — library detection and data merging."""
 from __future__ import annotations
 
-from leafscan.aggregator import aggregate, _detect_libraries, _detect_font_services
+from leafscan.aggregator import (
+    aggregate,
+    _detect_libraries,
+    _detect_font_services,
+    _detect_frameworks_from_cdn,
+    _detect_build_tools,
+)
 
 
 # ── Library detection ──────────────────────────────────────────────────────────
@@ -99,3 +105,65 @@ class TestAggregate:
         network = []
         aggregate(css_data, network)
         assert "detected_libraries" not in css_data
+
+    def test_aggregate_includes_frameworks_and_media(self):
+        css_data = {
+            "globals": [],
+            "frameworks": ["Vue", "Nuxt"],
+            "media": {"video": [], "canvas": [], "webgl": False, "iframe_embeds": []},
+        }
+        network = [{"url": "https://example.com/_nuxt/chunk.js", "resource_type": "script"}]
+        assets = aggregate(css_data, network)
+
+        assert "detected_frameworks" in assets
+        assert "Nuxt" in assets["detected_frameworks"]
+        assert "Vue" in assets["detected_frameworks"]
+        assert "build_tools" in assets
+        assert "media" in assets
+
+    def test_framework_dedup_browser_and_cdn(self):
+        """Same framework detected via browser JS and CDN URL should appear only once."""
+        css_data = {"globals": [], "frameworks": ["Next.js"]}
+        network = [{"url": "https://example.com/_next/static/chunks/main.js", "resource_type": "script"}]
+        assets = aggregate(css_data, network)
+        assert assets["detected_frameworks"].count("Next.js") == 1
+
+
+# ── CDN framework detection ──────────────────────────────────────────────────
+
+class TestDetectFrameworksFromCDN:
+    def test_nextjs(self):
+        entries = [{"url": "https://example.com/_next/static/chunks/main.js", "resource_type": "script"}]
+        assert "Next.js" in _detect_frameworks_from_cdn(entries)
+
+    def test_nuxt(self):
+        entries = [{"url": "https://example.com/_nuxt/entry.js", "resource_type": "script"}]
+        assert "Nuxt" in _detect_frameworks_from_cdn(entries)
+
+    def test_gatsby(self):
+        entries = [{"url": "https://example.com/page-data/index/page-data.json", "resource_type": "fetch"}]
+        assert "Gatsby" in _detect_frameworks_from_cdn(entries)
+
+    def test_vite(self):
+        entries = [{"url": "https://example.com/@vite/client", "resource_type": "script"}]
+        assert "Vite" in _detect_frameworks_from_cdn(entries)
+
+    def test_no_false_positives(self):
+        entries = [{"url": "https://example.com/app.js", "resource_type": "script"}]
+        assert _detect_frameworks_from_cdn(entries) == []
+
+
+# ── Build tool detection ──────────────────────────────────────────────────────
+
+class TestDetectBuildTools:
+    def test_vite(self):
+        entries = [{"url": "https://example.com/@vite/client", "resource_type": "script"}]
+        assert "Vite" in _detect_build_tools(entries)
+
+    def test_webpack(self):
+        entries = [{"url": "https://example.com/static/js/__webpack_require__.js", "resource_type": "script"}]
+        assert "Webpack" in _detect_build_tools(entries)
+
+    def test_no_false_positives(self):
+        entries = [{"url": "https://example.com/main.js", "resource_type": "script"}]
+        assert _detect_build_tools(entries) == []

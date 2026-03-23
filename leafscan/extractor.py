@@ -170,6 +170,148 @@ EXTRACT_SCRIPT = """
     }
   }
 
+  // ── 7. Frontend framework detection ─────────────────────────────────────────
+  // Detect frameworks via DOM markers, global variables, and meta tags.
+  result.frameworks = [];
+
+  // React
+  if (window.__REACT_DEVTOOLS_GLOBAL_HOOK__
+      || document.querySelector('[data-reactroot]')
+      || document.querySelector('[data-reactid]')
+      || document.getElementById('__next')) {
+    result.frameworks.push('React');
+    if (window.__NEXT_DATA__ || document.getElementById('__next')) {
+      result.frameworks.push('Next.js');
+    }
+  }
+  // Remix
+  if (window.__remixContext || document.querySelector('[data-remix-run]')) {
+    if (!result.frameworks.includes('React')) result.frameworks.push('React');
+    result.frameworks.push('Remix');
+  }
+
+  // Vue
+  if (window.__VUE__ || window.__vue_app__
+      || document.querySelector('[data-v-]')
+      || document.querySelector('[data-server-rendered]')) {
+    result.frameworks.push('Vue');
+    if (window.__NUXT__ || document.getElementById('__nuxt')) {
+      result.frameworks.push('Nuxt');
+    }
+  }
+
+  // Angular
+  if (document.querySelector('[ng-version]')
+      || document.querySelector('[ng-app]')
+      || document.querySelector('app-root')
+      || window.getAllAngularRootElements) {
+    result.frameworks.push('Angular');
+  }
+
+  // Svelte
+  if (window.__svelte
+      || document.querySelector('[class*="svelte-"]')
+      || document.querySelector('style[data-svelte]')) {
+    result.frameworks.push('Svelte');
+    if (document.querySelector('[data-sveltekit-hydrate]')
+        || document.getElementById('svelte-announcer')) {
+      result.frameworks.push('SvelteKit');
+    }
+  }
+
+  // Astro
+  if (document.querySelector('[data-astro-cid]')
+      || document.querySelector('astro-island')
+      || document.querySelector('meta[name="generator"][content*="Astro"]')) {
+    result.frameworks.push('Astro');
+  }
+
+  // Gatsby
+  if (document.getElementById('___gatsby')) {
+    result.frameworks.push('Gatsby');
+  }
+
+  // WordPress
+  if (document.querySelector('meta[name="generator"][content*="WordPress"]')
+      || document.querySelector('link[href*="wp-content"]')) {
+    result.frameworks.push('WordPress');
+  }
+
+  // jQuery
+  if (window.jQuery || (window.$ && window.$.fn && window.$.fn.jquery)) {
+    result.frameworks.push('jQuery');
+  }
+
+  // ── 8. Media & renderer detection ───────────────────────────────────────────
+  result.media = {
+    video:          [],
+    canvas:         [],
+    webgl:          false,
+    iframe_embeds:  [],
+  };
+
+  // Video elements
+  document.querySelectorAll('video').forEach(v => {
+    result.media.video.push({
+      src:      v.currentSrc || v.src || '',
+      poster:   v.poster || '',
+      autoplay: v.autoplay,
+      loop:     v.loop,
+      muted:    v.muted,
+      width:    v.videoWidth || v.clientWidth,
+      height:   v.videoHeight || v.clientHeight,
+    });
+  });
+
+  // Canvas elements + WebGL detection
+  document.querySelectorAll('canvas').forEach(c => {
+    let contextType = 'unknown';
+    try {
+      if (c.getContext('webgl2'))     contextType = 'webgl2';
+      else if (c.getContext('webgl')) contextType = 'webgl';
+      else if (c.getContext('2d'))    contextType = '2d';
+    } catch(_) {}
+    result.media.canvas.push({
+      width:   c.width,
+      height:  c.height,
+      context: contextType,
+    });
+    if (contextType === 'webgl' || contextType === 'webgl2') {
+      result.media.webgl = true;
+    }
+  });
+
+  // Embedded iframes (YouTube, Vimeo, Spline, Sketchfab, etc.)
+  document.querySelectorAll('iframe[src]').forEach(f => {
+    const src = f.src || '';
+    const known = [
+      ['youtube.com', 'YouTube'],  ['youtu.be', 'YouTube'],
+      ['vimeo.com', 'Vimeo'],
+      ['spline.design', 'Spline 3D'],
+      ['sketchfab.com', 'Sketchfab'],
+      ['player.bilibili.com', 'Bilibili'],
+      ['codepen.io', 'CodePen'],
+      ['lottiefiles.com', 'LottieFiles'],
+    ];
+    for (const [domain, label] of known) {
+      if (src.includes(domain)) {
+        result.media.iframe_embeds.push({ service: label, src });
+        break;
+      }
+    }
+  });
+
+  // Spline runtime (3D web tool)
+  if (window.SPE || document.querySelector('spline-viewer')
+      || document.querySelector('canvas[data-engine*="spline"]')) {
+    result.frameworks.push('Spline');
+  }
+
+  // model-viewer (Google 3D viewer web component)
+  if (document.querySelector('model-viewer')) {
+    result.frameworks.push('model-viewer');
+  }
+
   return result;
 })()
 """
@@ -190,6 +332,8 @@ def parse_raw(raw: dict) -> dict:
         "transitions": _dedup(raw.get("transitions", [])),
         "layout":      _clean_layout(raw.get("layout", {})),
         "globals":     raw.get("globals", []),
+        "frameworks":  raw.get("frameworks", []),
+        "media":       raw.get("media", {}),
     }
 
 
