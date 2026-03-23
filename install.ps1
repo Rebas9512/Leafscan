@@ -179,7 +179,7 @@ if ($needsSetup) {
 
     # Always ensure manage deps (fastapi, uvicorn) are installed for Web UI
     Write-Info "Installing LeafHub Web UI dependencies..."
-    & $VenvPip install "leafhub[manage] @ git+https://github.com/Rebas9512/Leafhub.git" --quiet
+    & $VenvPip install "leafhub[manage] @ git+https://github.com/Rebas9512/Leafhub.git" --upgrade --no-cache-dir --quiet
     Assert-ExitCode "LeafHub install failed"
     Write-Ok "LeafHub ready."
 
