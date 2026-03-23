@@ -177,15 +177,11 @@ if ($needsSetup) {
     Write-Host ""
     Write-Host "${BOLD}-- LeafHub --${NC}"
 
-    if (-not (Test-Path $LeafhubBin)) {
-        Write-Info "Installing LeafHub with Web UI dependencies..."
-        & $VenvPip install "leafhub[manage] @ git+https://github.com/Rebas9512/Leafhub.git" --quiet
-        Assert-ExitCode "LeafHub install failed"
-        Write-Ok "LeafHub installed."
-    } else {
-        # Ensure manage deps are present (fastapi etc.)
-        & $VenvPip install "leafhub[manage] @ git+https://github.com/Rebas9512/Leafhub.git" --quiet 2>$null
-    }
+    # Always ensure manage deps (fastapi, uvicorn) are installed for Web UI
+    Write-Info "Installing LeafHub Web UI dependencies..."
+    & $VenvPip install "leafhub[manage] @ git+https://github.com/Rebas9512/Leafhub.git" --quiet
+    Assert-ExitCode "LeafHub install failed"
+    Write-Ok "LeafHub ready."
 
     Write-Info "Registering LeafScan project with LeafHub..."
     Write-Host "  ${MUTED}This will guide you through API provider setup.${NC}"
