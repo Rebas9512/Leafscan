@@ -108,7 +108,7 @@ if [[ ! -d "$LEAFSCAN_DIR/.git" ]] && [[ ! -e "$LEAFSCAN_DIR" ]]; then
 else
     if [[ ! -d "$LEAFSCAN_DIR/.git" ]]; then
         info "Directory exists — initialising git..."
-        git init "$LEAFSCAN_DIR" --quiet
+        git -C "$LEAFSCAN_DIR" init --quiet
         git -C "$LEAFSCAN_DIR" remote add origin "$REPO_URL" 2>/dev/null || true
     else
         info "Existing installation found — syncing to latest..."
