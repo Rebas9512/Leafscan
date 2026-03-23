@@ -183,14 +183,56 @@ if ($needsSetup) {
     Assert-ExitCode "LeafHub install failed"
     Write-Ok "LeafHub ready."
 
-    Write-Info "Registering LeafScan project with LeafHub..."
-    Write-Host "  ${MUTED}This will guide you through API provider setup.${NC}"
-    Write-Host ""
-    & $LeafhubBin register leafscan --path $InstallDir --alias llm
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "${MUTED}  Provider setup skipped -- run 'leafscan setup' later to configure.${NC}"
-    } else {
+    # Register project first (headless -- just creates the DB entry)
+    Write-Info "Registering LeafScan project..."
+    & $LeafhubBin register leafscan --path $InstallDir --alias llm --headless 2>$null
+    # Ignore errors -- project may already exist
+
+    # Now guide provider setup: start Web UI ourselves (avoids subprocess issues)
+    $canPrompt = $false
+    try { $canPrompt = [Console]::KeyAvailable -ne $null -and -not [Console]::IsInputRedirected } catch {}
+
+    if ($canPrompt) {
+        Write-Host ""
+        Write-Host "  ${BOLD}LeafScan needs an AI provider to work.${NC}"
+        Write-Host "  ${MUTED}LeafHub stores API keys encrypted locally -- nothing leaves your system.${NC}"
+        Write-Host ""
+        Write-Host "  How would you like to configure your provider?"
+        Write-Host "    ${GREEN}[1]${NC} Launch Web UI   -- visual setup at http://localhost:8765  (recommended)"
+        Write-Host "    ${GREEN}[2]${NC} Terminal        -- step-by-step CLI prompts"
+        Write-Host "    ${GREEN}[s]${NC} Skip            -- configure later with: leafscan setup"
+        Write-Host ""
+        $choice = Read-Host "  Choice [1]"
+        if (-not $choice) { $choice = "1" }
+
+        if ($choice -eq "1") {
+            Write-Info "Starting LeafHub Web UI..."
+            $manageProc = Start-Process -FilePath $LeafhubBin -ArgumentList "manage","--no-browser" -PassThru -WindowStyle Hidden
+            Start-Sleep -Seconds 2
+            Start-Process "http://localhost:8765"
+            Write-Host ""
+            Write-Host "  ${GREEN}Web UI opened at http://localhost:8765${NC}"
+            Write-Host "  Add a provider, then come back here."
+            Read-Host "`n  Press Enter when done"
+            Stop-Process -Id $manageProc.Id -Force -ErrorAction SilentlyContinue
+            # Re-run register to bind provider
+            & $LeafhubBin register leafscan --path $InstallDir --alias llm --headless 2>$null
+        } elseif ($choice -eq "2") {
+            & $LeafhubBin provider add
+            if ($LASTEXITCODE -eq 0) {
+                & $LeafhubBin register leafscan --path $InstallDir --alias llm --headless 2>$null
+            }
+        } else {
+            Write-Host "  ${MUTED}Skipped. Run 'leafscan setup' later to configure.${NC}"
+        }
+    }
+
+    # Verify
+    $provCheck2 = & $LeafhubBin provider list 2>$null
+    if ($LASTEXITCODE -eq 0 -and $provCheck2 -and ($provCheck2 | Where-Object { $_ -match '\S' }).Count -gt 1) {
         Write-Ok "LeafHub configured."
+    } else {
+        Write-Host "  ${MUTED}No providers configured yet. Run 'leafscan setup' to add one.${NC}"
     }
 }
 
