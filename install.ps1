@@ -77,14 +77,18 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 
 # -- Clone / update -----------------------------------------------------------
 if (Test-Path (Join-Path $InstallDir ".git")) {
-    Write-Info "Existing installation found -- updating..."
-    git -C $InstallDir pull --ff-only --quiet
-    Assert-ExitCode "git pull failed"
-    Write-Ok "Updated."
+    Write-Info "Existing installation found -- syncing to latest..."
+    git -C $InstallDir fetch origin --quiet
+    Assert-ExitCode "git fetch failed"
+    # Determine default branch (main or master)
+    $branch = (git -C $InstallDir symbolic-ref refs/remotes/origin/HEAD 2>$null) -replace '.*/','';
+    if (-not $branch) { $branch = "main" }
+    git -C $InstallDir reset --hard "origin/$branch" --quiet
+    Assert-ExitCode "git reset failed"
+    Write-Ok "Updated to latest ($branch)."
 } else {
-    # Clean up leftover directory without .git (e.g. from a failed install)
     if ((Test-Path $InstallDir -PathType Container) -and (Test-DirHasEntries $InstallDir)) {
-        Write-Info "Removing incomplete previous install at $InstallDir ..."
+        Write-Info "Directory exists without .git -- removing stale files..."
         Remove-Item -Recurse -Force $InstallDir
     }
     Write-Info "Cloning into $InstallDir ..."
