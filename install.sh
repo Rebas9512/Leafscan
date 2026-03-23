@@ -82,6 +82,9 @@ else
     LEAFSCAN_DIR="$default_dir"
 fi
 
+# If path is a file (not a directory), remove it
+if [[ -f "$LEAFSCAN_DIR" ]]; then rm -f "$LEAFSCAN_DIR"; fi
+
 # If target exists and is non-empty but not a git repo, redirect to subdirectory
 if [[ ! -d "$LEAFSCAN_DIR/.git" ]] && \
    [[ -d "$LEAFSCAN_DIR" ]] && dir_has_entries "$LEAFSCAN_DIR"; then
@@ -103,20 +106,24 @@ command -v git >/dev/null 2>&1 || fail "git is required but not found."
 # ── Clone / update ───────────────────────────────────────────────────────────
 if [[ ! -d "$LEAFSCAN_DIR/.git" ]] && [[ ! -e "$LEAFSCAN_DIR" ]]; then
     info "Cloning into $LEAFSCAN_DIR ..."
-    git clone --depth=1 "$REPO_URL" "$LEAFSCAN_DIR" --quiet
+    git clone --depth=1 "$REPO_URL" "$LEAFSCAN_DIR" --quiet \
+        || fail "git clone failed."
     ok "Cloned."
 else
     if [[ ! -d "$LEAFSCAN_DIR/.git" ]]; then
         info "Directory exists — initialising git..."
-        git -C "$LEAFSCAN_DIR" init --quiet
+        git -C "$LEAFSCAN_DIR" init --quiet \
+            || fail "git init failed."
         git -C "$LEAFSCAN_DIR" remote add origin "$REPO_URL" 2>/dev/null || true
     else
         info "Existing installation found — syncing to latest..."
     fi
-    git -C "$LEAFSCAN_DIR" fetch origin --depth=1 --quiet
+    git -C "$LEAFSCAN_DIR" fetch origin --depth=1 --quiet \
+        || fail "git fetch failed."
     branch="$(git -C "$LEAFSCAN_DIR" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|.*/||')"
     [[ -z "$branch" ]] && branch="main"
-    git -C "$LEAFSCAN_DIR" reset --hard "origin/$branch" --quiet
+    git -C "$LEAFSCAN_DIR" reset --hard "origin/$branch" --quiet \
+        || fail "git reset failed."
     git -C "$LEAFSCAN_DIR" clean -fd --quiet 2>/dev/null || true
     ok "Synced to latest ($branch)."
 fi
