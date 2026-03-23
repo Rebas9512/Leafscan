@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -81,7 +82,6 @@ def _cmd_clean(yes: bool = False) -> None:
             print("Cancelled.")
             return
 
-    import shutil
     for d in entries:
         shutil.rmtree(d)
     print(f"Removed {len(entries)} output(s).")
@@ -107,38 +107,76 @@ def _cmd_scan(url: str, alias: str = "llm") -> None:
 def _cmd_setup() -> None:
     """
     Self-repair command. Checks in order:
-      1. Full credential resolution via Leafhub — exits OK if successful
-      2. Tries auto-binding to the first available provider
-      3. Prints actionable guidance if everything fails
+      1. Full credential resolution via Leafhub -- exits OK if successful
+      2. Ensures leafhub is installed (auto-installs if missing)
+      3. Tries auto-binding to the first available provider
+      4. Prints actionable guidance if everything fails
     """
     # Fast path: probe credentials
-    try:
-        from leafhub_dist.probe import detect
-        result = detect()
-        if result.ready:
-            hub = result.open_sdk()
-            hub.get_key(_ALIAS)
-            print(f"[setup] OK — credentials resolve via LeafHub (alias: {_ALIAS!r})")
-            return
-    except Exception as e:
-        print(f"[setup] LeafHub probe failed: {e}")
+    detect = None
+    for _mod in ("leafhub.probe", "leafhub_dist.probe"):
+        try:
+            import importlib
+            detect = importlib.import_module(_mod).detect
+            break
+        except ImportError:
+            continue
 
-    # Check prerequisites
-    dotfile = _ROOT / ".leafhub"
-    if not dotfile.exists():
-        print("[setup] .leafhub not found — run ./setup.sh first.")
-        sys.exit(1)
+    if detect is not None:
+        try:
+            result = detect()
+            if result.ready:
+                hub = result.open_sdk()
+                hub.get_key(_ALIAS)
+                print(f"[setup] OK -- credentials resolve via LeafHub (alias: {_ALIAS!r})")
+                return
+        except Exception as e:
+            print(f"[setup] LeafHub probe failed: {e}")
 
+    # Ensure leafhub is installed
     leafhub_bin = shutil.which("leafhub")
     if not leafhub_bin:
-        print("[setup] leafhub binary not found — install LeafHub first.")
-        sys.exit(1)
+        print("[setup] LeafHub not found -- installing (required dependency) ...")
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install",
+                 "leafhub @ git+https://github.com/Rebas9512/Leafhub.git"],
+                check=True,
+            )
+            leafhub_bin = shutil.which("leafhub")
+        except Exception as e:
+            print(f"[setup] Auto-install failed: {e}")
+
+        if not leafhub_bin:
+            # Try the venv Scripts dir directly
+            venv_bin = Path(sys.executable).parent / ("leafhub.exe" if sys.platform == "win32" else "leafhub")
+            if venv_bin.exists():
+                leafhub_bin = str(venv_bin)
+
+        if not leafhub_bin:
+            print("[setup] leafhub binary not found after install.")
+            print("        Install manually: pip install 'leafhub @ git+https://github.com/Rebas9512/Leafhub.git'")
+            sys.exit(1)
+        print(f"[setup] LeafHub installed: {leafhub_bin}")
+
+    # Check for .leafhub dotfile -- register project if missing
+    dotfile = _ROOT / ".leafhub"
+    if not dotfile.exists():
+        print("[setup] .leafhub not found -- registering project with LeafHub ...")
+        reg = subprocess.run(
+            [leafhub_bin, "register", "leafscan", "--path", str(_ROOT), "--headless"],
+            capture_output=True, text=True,
+        )
+        if reg.returncode != 0:
+            print(f"[setup] Registration failed. Run manually: leafhub register leafscan --path \"{_ROOT}\"")
+            sys.exit(1)
+        print("[setup] Project registered.")
 
     # Read project name from dotfile (never hardcode)
     try:
         project = json.loads(dotfile.read_text())["project"]
     except Exception:
-        print("[setup] .leafhub is malformed — re-run ./setup.sh.")
+        print("[setup] .leafhub is malformed -- re-run setup.")
         sys.exit(1)
 
     # Check vault state
