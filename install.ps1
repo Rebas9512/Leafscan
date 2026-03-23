@@ -175,14 +175,9 @@ foreach ($c in $candidates) {
     if (Test-Path $c) { $SystemLeafhub = $c; break }
 }
 
-# Check if providers are already configured
-$needsSetup = $true
-if (Test-Path $VenvLeafhub) {
-    $provCheck = & $VenvLeafhub provider list 2>$null
-    if ($LASTEXITCODE -eq 0 -and $provCheck -and ($provCheck | Where-Object { $_ -match '\S' }).Count -gt 1) {
-        $needsSetup = $false
-    }
-}
+# Check if project is already registered and configured
+$dotLeafhub = Join-Path $InstallDir ".leafhub"
+$needsSetup = -not (Test-Path $dotLeafhub)
 
 if ($needsSetup) {
     Write-Host ""
@@ -268,9 +263,9 @@ if ($needsSetup) {
         }
     }
 
-    # Verify
-    $provCheck2 = & $LeafhubCmd provider list 2>$null
-    if ($LASTEXITCODE -eq 0 -and $provCheck2 -and ($provCheck2 | Where-Object { $_ -match '\S' }).Count -gt 1) {
+    # Verify -- just check exit code; avoid capturing Unicode output (charmap issues on PS 5.1)
+    & $LeafhubCmd provider list >$null 2>$null
+    if ($LASTEXITCODE -eq 0) {
         Write-Ok "LeafHub configured."
     } else {
         Write-Host "  ${MUTED}No providers configured yet. Run 'leafscan setup' to add one.${NC}"
