@@ -158,6 +158,49 @@ Write-Info "Installing leafscan[leafhub] ..."
 Assert-ExitCode "Package install failed"
 Write-Ok "Package installed."
 
+# -- LeafHub setup -------------------------------------------------------------
+$LeafhubBin = Join-Path $ScriptsDir "leafhub.exe"
+if (-not (Test-Path $LeafhubBin)) {
+    $LeafhubBin = Join-Path $ScriptsDir "leafhub"
+}
+
+# Check if leafhub has providers configured (i.e. is fully set up)
+$needsSetup = $true
+if (Test-Path $LeafhubBin) {
+    $provCheck = & $LeafhubBin provider list 2>$null
+    if ($LASTEXITCODE -eq 0 -and $provCheck -and ($provCheck | Where-Object { $_ -match '\S' }).Count -gt 1) {
+        $needsSetup = $false
+    }
+}
+
+if ($needsSetup) {
+    Write-Host ""
+    Write-Host "${BOLD}-- LeafHub --${NC}"
+
+    if (-not (Test-Path $LeafhubBin)) {
+        Write-Info "Installing LeafHub with Web UI dependencies..."
+        & $VenvPip install "leafhub[manage] @ git+https://github.com/Rebas9512/Leafhub.git" --quiet
+        Assert-ExitCode "LeafHub install failed"
+        Write-Ok "LeafHub installed."
+    } else {
+        # Ensure manage deps are present (fastapi etc.)
+        & $VenvPip install "leafhub[manage] @ git+https://github.com/Rebas9512/Leafhub.git" --quiet 2>$null
+    }
+
+    Write-Info "Registering LeafScan project with LeafHub..."
+    Write-Host "  ${MUTED}This will guide you through API provider setup.${NC}"
+    Write-Host ""
+    & $LeafhubBin register leafscan --path $InstallDir --alias llm
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "${MUTED}  Provider setup skipped -- run 'leafscan setup' later to configure.${NC}"
+    } else {
+        Write-Ok "LeafHub configured."
+    }
+}
+
+# -- Playwright ----------------------------------------------------------------
+Write-Host ""
+Write-Host "${BOLD}-- Playwright --${NC}"
 Write-Info "Installing Playwright + Chromium ..."
 & $VenvPython -m playwright install chromium
 Assert-ExitCode "Playwright install failed"
@@ -183,8 +226,9 @@ Write-Host "${BOLD}  LeafScan installed!${NC}"
 Write-Host ""
 Write-Host "  ${MUTED}If the command is not recognised, open a new terminal first.${NC}"
 Write-Host ""
-Write-Host "  ${GREEN}leafscan --help${NC}       # verify install"
-Write-Host "  ${GREEN}leafscan run${NC}          # start scanning"
+Write-Host "  ${GREEN}leafscan --help${NC}              # verify install"
+Write-Host "  ${GREEN}leafscan scan <url>${NC}          # scan a webpage"
+Write-Host "  ${GREEN}leafscan setup${NC}               # configure LeafHub"
 Write-Host ""
 Write-Host "  ${MUTED}Install dir:  $InstallDir${NC}"
 Write-Host "  ${MUTED}To update:    git -C `"$InstallDir`" pull${NC}"
