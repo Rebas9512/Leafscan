@@ -58,6 +58,17 @@ jobs:
           bash -n install.sh
           bash -n setup.sh
 
+      - name: PS1 ASCII enforcement
+        run: |
+          for f in install.ps1; do
+            if grep -Pq '[^\x00-\x7F]' "$f"; then
+              echo "ERROR: $f contains non-ASCII characters"
+              grep -Pn '[^\x00-\x7F]' "$f"
+              exit 1
+            fi
+            echo "$f: ASCII OK"
+          done
+
   ps1-syntax:
     name: PowerShell syntax check
     runs-on: windows-latest
