@@ -1,5 +1,5 @@
-# ──────────────────────────────────────────────────────────────────────────────
-#  LeafScan — Windows One-liner Installer
+# ------------------------------------------------------------------------------
+#  LeafScan -- Windows One-liner Installer
 #
 #  irm https://raw.githubusercontent.com/Rebas9512/Leafscan/main/install.ps1 | iex
 #
@@ -9,7 +9,7 @@
 #  Environment variables:
 #    LEAFSCAN_DIR         Override the install directory
 #    LEAFSCAN_REPO_URL    Override the git clone URL
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 param(
     [string]$InstallDir = "",
     [switch]$Headless
@@ -23,8 +23,8 @@ $RepoUrl = if ($env:LEAFSCAN_REPO_URL) { $env:LEAFSCAN_REPO_URL } `
 $ESC = [char]0x1b
 $GREEN = "${ESC}[38;2;0;229;180m"; $RED = "${ESC}[38;2;230;57;70m"
 $MUTED = "${ESC}[38;2;110;120;148m"; $BOLD = "${ESC}[1m"; $NC = "${ESC}[0m"
-function Write-Ok($msg)   { Write-Host "${GREEN}√${NC}  $msg" }
-function Write-Info($msg) { Write-Host "${MUTED}·${NC}  $msg" }
+function Write-Ok($msg)   { Write-Host "${GREEN}+${NC}  $msg" }
+function Write-Info($msg) { Write-Host "${MUTED}.${NC}  $msg" }
 function Write-Fail($msg) { Write-Host "${RED}x${NC}  $msg"; exit 1 }
 
 function Test-DirHasEntries([string]$Dir) {
@@ -32,7 +32,7 @@ function Test-DirHasEntries([string]$Dir) {
     return $null -ne (Get-ChildItem -Force -LiteralPath $Dir | Select-Object -First 1)
 }
 
-# ── Select install directory ─────────────────────────────────────────────────
+# -- Select install directory -------------------------------------------------
 if (-not $InstallDir) {
     if ($env:LEAFSCAN_DIR) {
         $InstallDir = $env:LEAFSCAN_DIR
@@ -55,25 +55,25 @@ $InstallDir = [IO.Path]::GetFullPath($InstallDir)
 
 if (-not (Test-Path (Join-Path $InstallDir ".git"))) {
     if ((Test-Path $InstallDir -PathType Container) -and (Test-DirHasEntries $InstallDir)) {
-        Write-Info "Target is non-empty — using subdirectory: $InstallDir\leafscan"
+        Write-Info "Target is non-empty -- using subdirectory: $InstallDir\leafscan"
         $InstallDir = [IO.Path]::GetFullPath((Join-Path $InstallDir "leafscan"))
     }
 }
 
-# ── Banner ───────────────────────────────────────────────────────────────────
+# -- Banner -------------------------------------------------------------------
 Write-Host ""
-Write-Host "${BOLD}  LeafScan — Installer${NC}"
+Write-Host "${BOLD}  LeafScan -- Installer${NC}"
 Write-Host "${MUTED}  Install path: $InstallDir${NC}"
 Write-Host ""
 
-# ── Prerequisites ────────────────────────────────────────────────────────────
+# -- Prerequisites ------------------------------------------------------------
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     Write-Fail "git is required.`n  Install: winget install Git.Git  or  https://git-scm.com"
 }
 
-# ── Clone / update ───────────────────────────────────────────────────────────
+# -- Clone / update -----------------------------------------------------------
 if (Test-Path (Join-Path $InstallDir ".git")) {
-    Write-Info "Existing installation found — updating..."
+    Write-Info "Existing installation found -- updating..."
     git -C $InstallDir pull --ff-only --quiet
     Write-Ok "Updated."
 } else {
@@ -82,8 +82,8 @@ if (Test-Path (Join-Path $InstallDir ".git")) {
     Write-Ok "Cloned."
 }
 
-# ── Python 3.11+ ──────────────────────────────────────────────────────────────
-Write-Host "${BOLD}── Python ──${NC}"
+# -- Python 3.11+ --------------------------------------------------------------
+Write-Host "${BOLD}-- Python --${NC}"
 
 function Find-Python {
     foreach ($cmd in @("python3.13","python3.12","python3.11","python3","python")) {
@@ -105,9 +105,9 @@ if (-not $Python) {
 $PyVer = & $Python -c "import sys; print(sys.version.split()[0])" 2>$null
 Write-Ok "Python: $Python ($PyVer)"
 
-# ── Virtual environment + install ─────────────────────────────────────────────
+# -- Virtual environment + install ---------------------------------------------
 Write-Host ""
-Write-Host "${BOLD}── Virtual environment ──${NC}"
+Write-Host "${BOLD}-- Virtual environment --${NC}"
 
 $VenvDir    = Join-Path $InstallDir ".venv"
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
@@ -119,7 +119,7 @@ if (-not (Test-Path $VenvPython)) {
     & $Python -m venv $VenvDir
     Write-Ok "Venv created."
 } else {
-    Write-Ok "Venv exists — reusing."
+    Write-Ok "Venv exists -- reusing."
 }
 
 Write-Info "Upgrading pip ..."
@@ -133,9 +133,9 @@ Write-Info "Installing Playwright + Chromium ..."
 & $VenvPython -m playwright install chromium
 Write-Ok "Playwright ready."
 
-# ── PATH ──────────────────────────────────────────────────────────────────────
+# -- PATH ----------------------------------------------------------------------
 Write-Host ""
-Write-Host "${BOLD}── PATH ──${NC}"
+Write-Host "${BOLD}-- PATH --${NC}"
 
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if (-not $userPath) { $userPath = "" }
@@ -147,7 +147,7 @@ if ($userPath -notlike "*$ScriptsDir*") {
 $env:Path = "$ScriptsDir;$env:Path"
 Write-Ok "PATH updated."
 
-# ── Done ──────────────────────────────────────────────────────────────────────
+# -- Done ----------------------------------------------------------------------
 Write-Host ""
 Write-Host "${BOLD}  LeafScan installed!${NC}"
 Write-Host ""
