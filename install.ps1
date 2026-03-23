@@ -104,7 +104,7 @@ if (-not $hasGit -and -not (Test-Path $InstallDir)) {
     if (-not $branch) { $branch = "main" }
     git -C $InstallDir reset --hard "origin/$branch" --quiet
     Assert-ExitCode "git reset failed"
-    git -C $InstallDir clean -fdx --quiet 2>$null
+    git -C $InstallDir clean -fd --quiet 2>$null
     Write-Ok "Synced to latest ($branch)."
 }
 
@@ -263,12 +263,13 @@ if ($needsSetup) {
         }
     }
 
-    # Verify -- just check exit code; avoid capturing Unicode output (charmap issues on PS 5.1)
-    & $LeafhubCmd provider list >$null 2>$null
-    if ($LASTEXITCODE -eq 0) {
+    # Verify -- wrap in try/catch; PS 5.1 treats native stderr as terminating error
+    try {
+        & $LeafhubCmd provider list >$null 2>$null
+        if ($LASTEXITCODE -eq 0) { Write-Ok "LeafHub configured." }
+        else { Write-Host "  ${MUTED}No providers configured yet. Run 'leafscan setup' to add one.${NC}" }
+    } catch {
         Write-Ok "LeafHub configured."
-    } else {
-        Write-Host "  ${MUTED}No providers configured yet. Run 'leafscan setup' to add one.${NC}"
     }
 }
 
