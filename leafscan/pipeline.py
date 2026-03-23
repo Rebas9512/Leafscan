@@ -36,31 +36,31 @@ def run(url: str, alias: str = "llm") -> Path:
     t_start    = time.monotonic()
 
     # ── Step 0: model resolution + capability probe ───────────────────────────
-    print(f"[leafscan] Connecting to model (alias={alias!r}) ...")
+    print(f"[leafscan] Connecting to model (alias={alias!r}) ...", flush=True)
     model = resolve(alias=alias)
 
-    print(f"[leafscan] Probing capabilities ({model.model}) ...")
+    print(f"[leafscan] Probing capabilities ({model.model}) ...", flush=True)
     caps      = probe_caps(model)
     model.caps = caps
     cap_label  = "vision + text" if Cap.VISION in caps else "text-only"
-    print(f"[leafscan] Capability confirmed: {cap_label}")
+    print(f"[leafscan] Capability confirmed: {cap_label}", flush=True)
 
     # ── Steps 1+2: scrape + extract ───────────────────────────────────────────
-    print(f"[leafscan] Scraping {url} ...")
+    print(f"[leafscan] Scraping {url} ...", flush=True)
     result = scrape(url, output_dir)
-    print(f"[leafscan] Captured {len(result.screenshot_paths)} scroll frames")
+    print(f"[leafscan] Captured {len(result.screenshot_paths)} scroll frames", flush=True)
 
     # Persist raw intermediate data for debugging
     _write_json(output_dir / "css.json",    result.css_data)
     _write_json(output_dir / "network.json", result.network_entries)
 
     # ── Step 3: aggregate ─────────────────────────────────────────────────────
-    print("[leafscan] Aggregating ...")
+    print("[leafscan] Aggregating ...", flush=True)
     assets_data = aggregate(result.css_data, result.network_entries)
     _write_json(output_dir / "assets.json", assets_data)
 
     # ── Step 4: LLM report ────────────────────────────────────────────────────
-    print("[leafscan] Generating report ...")
+    print("[leafscan] Generating report ...", flush=True)
     system_prompt = (_PROMPTS_DIR / "design_report.txt").read_text()
     report_md     = generate_report(
         css_data         = result.css_data,
@@ -76,7 +76,7 @@ def run(url: str, alias: str = "llm") -> Path:
     report_path = output_dir / "report.md"
     report_path.write_text(report_final, encoding="utf-8")
 
-    print(f"[leafscan] Done in {elapsed:.1f}s → {report_path}")
+    print(f"\n[leafscan] Done in {elapsed:.1f}s -> {report_path}", flush=True)
     return report_path
 
 
