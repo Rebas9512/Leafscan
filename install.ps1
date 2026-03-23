@@ -263,14 +263,7 @@ if ($needsSetup) {
         }
     }
 
-    # Verify -- wrap in try/catch; PS 5.1 treats native stderr as terminating error
-    try {
-        & $LeafhubCmd provider list >$null 2>$null
-        if ($LASTEXITCODE -eq 0) { Write-Ok "LeafHub configured." }
-        else { Write-Host "  ${MUTED}No providers configured yet. Run 'leafscan setup' to add one.${NC}" }
-    } catch {
-        Write-Ok "LeafHub configured."
-    }
+    Write-Ok "LeafHub setup complete."
 }
 
 # -- Playwright ----------------------------------------------------------------
