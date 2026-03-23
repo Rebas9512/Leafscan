@@ -108,13 +108,8 @@ if [[ -d "$LEAFSCAN_DIR/.git" ]]; then
     [[ -z "$branch" ]] && branch="main"
     git -C "$LEAFSCAN_DIR" reset --hard "origin/$branch" --quiet
     ok "Updated to latest ($branch)."
-elif [[ -d "$LEAFSCAN_DIR" ]] && [[ -n "$(ls -A "$LEAFSCAN_DIR" 2>/dev/null)" ]]; then
-    info "Directory exists without .git — removing stale files..."
-    rm -rf "$LEAFSCAN_DIR"
-    info "Cloning into $LEAFSCAN_DIR ..."
-    git clone --depth=1 "$REPO_URL" "$LEAFSCAN_DIR" --quiet
-    ok "Cloned."
 else
+    [[ -e "$LEAFSCAN_DIR" ]] && { info "Removing stale directory $LEAFSCAN_DIR ..."; rm -rf "$LEAFSCAN_DIR"; }
     info "Cloning into $LEAFSCAN_DIR ..."
     git clone --depth=1 "$REPO_URL" "$LEAFSCAN_DIR" --quiet
     ok "Cloned."
