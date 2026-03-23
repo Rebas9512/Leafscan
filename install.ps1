@@ -206,9 +206,12 @@ if ($needsSetup) {
         }
     }
 
-    # Register project (use venv leafhub for DB operations)
+    # Use standalone leafhub for all operations (has fastapi + ui/)
+    $LeafhubCmd = if ($SystemLeafhub) { $SystemLeafhub } else { $VenvLeafhub }
+
+    # Register project
     Write-Info "Registering LeafScan project..."
-    & $VenvLeafhub register leafscan --path $InstallDir --alias llm --headless 2>$null
+    & $LeafhubCmd register leafscan --path $InstallDir --alias llm --headless 2>$null
 
     # Guide provider setup
     $canPrompt = $false
@@ -237,11 +240,11 @@ if ($needsSetup) {
             Write-Host "  Add a provider, then come back here."
             Read-Host "`n  Press Enter when done"
             Stop-Process -Id $manageProc.Id -Force -ErrorAction SilentlyContinue
-            & $VenvLeafhub register leafscan --path $InstallDir --alias llm --headless 2>$null
+            & $LeafhubCmd register leafscan --path $InstallDir --alias llm --headless 2>$null
         } elseif ($choice -eq "2") {
-            & $VenvLeafhub provider add
+            & $LeafhubCmd provider add
             if ($LASTEXITCODE -eq 0) {
-                & $VenvLeafhub register leafscan --path $InstallDir --alias llm --headless 2>$null
+                & $LeafhubCmd register leafscan --path $InstallDir --alias llm --headless 2>$null
             }
         } else {
             Write-Host "  ${MUTED}Skipped. Run 'leafscan setup' later to configure.${NC}"
@@ -258,15 +261,15 @@ if ($needsSetup) {
         $choice = Read-Host "  Choice [1]"
         if (-not $choice) { $choice = "1" }
         if ($choice -eq "1") {
-            & $VenvLeafhub provider add
+            & $LeafhubCmd provider add
             if ($LASTEXITCODE -eq 0) {
-                & $VenvLeafhub register leafscan --path $InstallDir --alias llm --headless 2>$null
+                & $LeafhubCmd register leafscan --path $InstallDir --alias llm --headless 2>$null
             }
         }
     }
 
     # Verify
-    $provCheck2 = & $VenvLeafhub provider list 2>$null
+    $provCheck2 = & $LeafhubCmd provider list 2>$null
     if ($LASTEXITCODE -eq 0 -and $provCheck2 -and ($provCheck2 | Where-Object { $_ -match '\S' }).Count -gt 1) {
         Write-Ok "LeafHub configured."
     } else {
