@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+outputs/
+.env
+.leafhub
+.pytest_cache/
+*.log
