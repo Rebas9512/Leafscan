@@ -159,15 +159,26 @@ Assert-ExitCode "Package install failed"
 Write-Ok "Package installed."
 
 # -- LeafHub setup -------------------------------------------------------------
-$LeafhubBin = Join-Path $ScriptsDir "leafhub.exe"
-if (-not (Test-Path $LeafhubBin)) {
-    $LeafhubBin = Join-Path $ScriptsDir "leafhub"
+# The venv leafhub (pip package) can register/bind but cannot run the Web UI
+# (it needs the ui/ directory from a full git clone). Find or install a
+# standalone leafhub for manage, and use the venv one for register/bind.
+$VenvLeafhub = Join-Path $ScriptsDir "leafhub.exe"
+if (-not (Test-Path $VenvLeafhub)) { $VenvLeafhub = Join-Path $ScriptsDir "leafhub" }
+
+# Look for a standalone leafhub installation (full clone with ui/)
+$SystemLeafhub = $null
+$candidates = @(
+    (Join-Path $env:USERPROFILE "leafhub\.venv\Scripts\leafhub.exe"),
+    (Join-Path $env:USERPROFILE "leafhub\.venv\Scripts\leafhub")
+)
+foreach ($c in $candidates) {
+    if (Test-Path $c) { $SystemLeafhub = $c; break }
 }
 
-# Check if leafhub has providers configured (i.e. is fully set up)
+# Check if providers are already configured
 $needsSetup = $true
-if (Test-Path $LeafhubBin) {
-    $provCheck = & $LeafhubBin provider list 2>$null
+if (Test-Path $VenvLeafhub) {
+    $provCheck = & $VenvLeafhub provider list 2>$null
     if ($LASTEXITCODE -eq 0 -and $provCheck -and ($provCheck | Where-Object { $_ -match '\S' }).Count -gt 1) {
         $needsSetup = $false
     }
@@ -177,22 +188,33 @@ if ($needsSetup) {
     Write-Host ""
     Write-Host "${BOLD}-- LeafHub --${NC}"
 
-    # Always ensure manage deps (fastapi, uvicorn) are installed for Web UI
-    Write-Info "Installing LeafHub Web UI dependencies..."
-    & $VenvPip install "leafhub[manage] @ git+https://github.com/Rebas9512/Leafhub.git" --upgrade --no-cache-dir --quiet
-    Assert-ExitCode "LeafHub install failed"
-    Write-Ok "LeafHub ready."
+    # Install standalone leafhub if not present (needed for Web UI)
+    if (-not $SystemLeafhub) {
+        Write-Info "Installing LeafHub (required for API key management)..."
+        Write-Host "  ${MUTED}This provides the Web UI for configuring API providers.${NC}"
+        Write-Host ""
+        try {
+            $leafhubInstallUrl = "https://raw.githubusercontent.com/Rebas9512/Leafhub/main/install.ps1"
+            & ([scriptblock]::Create((Invoke-RestMethod $leafhubInstallUrl)))
+        } catch {
+            Write-Host "  ${MUTED}LeafHub auto-install failed. Install manually:${NC}"
+            Write-Host "  ${MUTED}  irm https://raw.githubusercontent.com/Rebas9512/Leafhub/main/install.ps1 | iex${NC}"
+        }
+        # Re-check after install
+        foreach ($c in $candidates) {
+            if (Test-Path $c) { $SystemLeafhub = $c; break }
+        }
+    }
 
-    # Register project first (headless -- just creates the DB entry)
+    # Register project (use venv leafhub for DB operations)
     Write-Info "Registering LeafScan project..."
-    & $LeafhubBin register leafscan --path $InstallDir --alias llm --headless 2>$null
-    # Ignore errors -- project may already exist
+    & $VenvLeafhub register leafscan --path $InstallDir --alias llm --headless 2>$null
 
-    # Now guide provider setup: start Web UI ourselves (avoids subprocess issues)
+    # Guide provider setup
     $canPrompt = $false
     try { $canPrompt = [Console]::KeyAvailable -ne $null -and -not [Console]::IsInputRedirected } catch {}
 
-    if ($canPrompt) {
+    if ($canPrompt -and $SystemLeafhub) {
         Write-Host ""
         Write-Host "  ${BOLD}LeafScan needs an AI provider to work.${NC}"
         Write-Host "  ${MUTED}LeafHub stores API keys encrypted locally -- nothing leaves your system.${NC}"
@@ -207,28 +229,44 @@ if ($needsSetup) {
 
         if ($choice -eq "1") {
             Write-Info "Starting LeafHub Web UI..."
-            $manageProc = Start-Process -FilePath $LeafhubBin -ArgumentList "manage","--no-browser" -PassThru -WindowStyle Hidden
-            Start-Sleep -Seconds 2
+            $manageProc = Start-Process -FilePath $SystemLeafhub -ArgumentList "manage","--no-browser" -PassThru -WindowStyle Hidden
+            Start-Sleep -Seconds 3
             Start-Process "http://localhost:8765"
             Write-Host ""
             Write-Host "  ${GREEN}Web UI opened at http://localhost:8765${NC}"
             Write-Host "  Add a provider, then come back here."
             Read-Host "`n  Press Enter when done"
             Stop-Process -Id $manageProc.Id -Force -ErrorAction SilentlyContinue
-            # Re-run register to bind provider
-            & $LeafhubBin register leafscan --path $InstallDir --alias llm --headless 2>$null
+            & $VenvLeafhub register leafscan --path $InstallDir --alias llm --headless 2>$null
         } elseif ($choice -eq "2") {
-            & $LeafhubBin provider add
+            & $VenvLeafhub provider add
             if ($LASTEXITCODE -eq 0) {
-                & $LeafhubBin register leafscan --path $InstallDir --alias llm --headless 2>$null
+                & $VenvLeafhub register leafscan --path $InstallDir --alias llm --headless 2>$null
             }
         } else {
             Write-Host "  ${MUTED}Skipped. Run 'leafscan setup' later to configure.${NC}"
         }
+    } elseif ($canPrompt) {
+        # No system leafhub with Web UI -- offer terminal only
+        Write-Host ""
+        Write-Host "  ${BOLD}LeafScan needs an AI provider to work.${NC}"
+        Write-Host "  ${MUTED}Configure now via terminal, or skip and run 'leafscan setup' later.${NC}"
+        Write-Host ""
+        Write-Host "    ${GREEN}[1]${NC} Terminal        -- step-by-step CLI prompts"
+        Write-Host "    ${GREEN}[s]${NC} Skip"
+        Write-Host ""
+        $choice = Read-Host "  Choice [1]"
+        if (-not $choice) { $choice = "1" }
+        if ($choice -eq "1") {
+            & $VenvLeafhub provider add
+            if ($LASTEXITCODE -eq 0) {
+                & $VenvLeafhub register leafscan --path $InstallDir --alias llm --headless 2>$null
+            }
+        }
     }
 
     # Verify
-    $provCheck2 = & $LeafhubBin provider list 2>$null
+    $provCheck2 = & $VenvLeafhub provider list 2>$null
     if ($LASTEXITCODE -eq 0 -and $provCheck2 -and ($provCheck2 | Where-Object { $_ -match '\S' }).Count -gt 1) {
         Write-Ok "LeafHub configured."
     } else {
