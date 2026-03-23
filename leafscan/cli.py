@@ -104,117 +104,104 @@ def _cmd_scan(url: str, alias: str = "llm") -> None:
 
 # ── setup ─────────────────────────────────────────────────────────────────────
 
+def _find_leafhub() -> str | None:
+    """Locate the leafhub binary, checking PATH then the current venv."""
+    path = shutil.which("leafhub")
+    if path:
+        return path
+    venv_bin = Path(sys.executable).parent / (
+        "leafhub.exe" if sys.platform == "win32" else "leafhub"
+    )
+    return str(venv_bin) if venv_bin.exists() else None
+
+
+def _ensure_leafhub() -> str:
+    """Return leafhub binary path, installing it first if necessary."""
+    leafhub_bin = _find_leafhub()
+    if leafhub_bin:
+        return leafhub_bin
+
+    print("[setup] LeafHub not found -- installing (required dependency) ...")
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install",
+             "leafhub @ git+https://github.com/Rebas9512/Leafhub.git"],
+            check=True,
+        )
+    except Exception as e:
+        print(f"[setup] Auto-install failed: {e}")
+        print("        Install manually: pip install 'leafhub @ git+https://github.com/Rebas9512/Leafhub.git'")
+        sys.exit(1)
+
+    leafhub_bin = _find_leafhub()
+    if not leafhub_bin:
+        print("[setup] leafhub binary not found after install.")
+        sys.exit(1)
+    print(f"[setup] LeafHub installed: {leafhub_bin}")
+    return leafhub_bin
+
+
 def _cmd_setup() -> None:
     """
-    Self-repair command. Checks in order:
-      1. Full credential resolution via Leafhub -- exits OK if successful
-      2. Ensures leafhub is installed (auto-installs if missing)
-      3. Tries auto-binding to the first available provider
-      4. Prints actionable guidance if everything fails
+    Self-repair command:
+      1. Fast-path: if credentials already resolve, exit OK
+      2. Ensure leafhub is installed
+      3. Run `leafhub register` interactively so the user can
+         add a provider and bind it to this project
+      4. Verify credentials resolve after registration
     """
-    # Fast path: probe credentials
-    detect = None
+    # ── Fast path: probe credentials ──────────────────────────────────────
     for _mod in ("leafhub.probe", "leafhub_dist.probe"):
         try:
             import importlib
             detect = importlib.import_module(_mod).detect
-            break
-        except ImportError:
-            continue
-
-    if detect is not None:
-        try:
             result = detect()
             if result.ready:
                 hub = result.open_sdk()
                 hub.get_key(_ALIAS)
                 print(f"[setup] OK -- credentials resolve via LeafHub (alias: {_ALIAS!r})")
                 return
-        except Exception as e:
-            print(f"[setup] LeafHub probe failed: {e}")
+        except Exception:
+            continue
 
-    # Ensure leafhub is installed
-    leafhub_bin = shutil.which("leafhub")
-    if not leafhub_bin:
-        print("[setup] LeafHub not found -- installing (required dependency) ...")
+    # ── Ensure leafhub is installed ───────────────────────────────────────
+    leafhub_bin = _ensure_leafhub()
+
+    # ── Run interactive registration ──────────────────────────────────────
+    # leafhub register handles the full flow:
+    #   - create/link project
+    #   - if no providers: prompt user to add one (Web UI or terminal)
+    #   - auto-bind provider to project
+    print()
+    print("[setup] Setting up LeafScan with LeafHub...")
+    print("        This will guide you through provider configuration.")
+    print()
+
+    reg_cmd = [leafhub_bin, "register", "leafscan",
+               "--path", str(_ROOT), "--alias", _ALIAS]
+    result = subprocess.run(reg_cmd)
+
+    if result.returncode != 0:
+        print()
+        print("[setup] Registration did not complete.")
+        print(f"        Retry: leafhub register leafscan --path \"{_ROOT}\" --alias {_ALIAS}")
+        sys.exit(1)
+
+    # ── Verify credentials resolve ────────────────────────────────────────
+    print()
+    for _mod in ("leafhub.probe", "leafhub_dist.probe"):
         try:
-            subprocess.run(
-                [sys.executable, "-m", "pip", "install",
-                 "leafhub @ git+https://github.com/Rebas9512/Leafhub.git"],
-                check=True,
-            )
-            leafhub_bin = shutil.which("leafhub")
-        except Exception as e:
-            print(f"[setup] Auto-install failed: {e}")
+            import importlib
+            importlib.invalidate_caches()
+            detect = importlib.import_module(_mod).detect
+            res = detect()
+            if res.ready:
+                hub = res.open_sdk()
+                hub.get_key(_ALIAS)
+                print(f"[setup] OK -- credentials resolve via LeafHub (alias: {_ALIAS!r})")
+                return
+        except Exception:
+            continue
 
-        if not leafhub_bin:
-            # Try the venv Scripts dir directly
-            venv_bin = Path(sys.executable).parent / ("leafhub.exe" if sys.platform == "win32" else "leafhub")
-            if venv_bin.exists():
-                leafhub_bin = str(venv_bin)
-
-        if not leafhub_bin:
-            print("[setup] leafhub binary not found after install.")
-            print("        Install manually: pip install 'leafhub @ git+https://github.com/Rebas9512/Leafhub.git'")
-            sys.exit(1)
-        print(f"[setup] LeafHub installed: {leafhub_bin}")
-
-    # Check for .leafhub dotfile -- register project if missing
-    dotfile = _ROOT / ".leafhub"
-    if not dotfile.exists():
-        print("[setup] .leafhub not found -- registering project with LeafHub ...")
-        reg = subprocess.run(
-            [leafhub_bin, "register", "leafscan", "--path", str(_ROOT), "--headless"],
-            capture_output=True, text=True,
-        )
-        if reg.returncode != 0:
-            print(f"[setup] Registration failed. Run manually: leafhub register leafscan --path \"{_ROOT}\"")
-            sys.exit(1)
-        print("[setup] Project registered.")
-
-    # Read project name from dotfile (never hardcode)
-    try:
-        project = json.loads(dotfile.read_text())["project"]
-    except Exception:
-        print("[setup] .leafhub is malformed -- re-run setup.")
-        sys.exit(1)
-
-    # Check vault state
-    show = subprocess.run(
-        [leafhub_bin, "project", "show", project],
-        capture_output=True, text=True,
-    )
-    if show.returncode != 0 or "not found" in show.stdout.lower():
-        print(f"[setup] Project '{project}' not found in vault — re-run ./setup.sh.")
-        sys.exit(1)
-
-    if _ALIAS in show.stdout:
-        print(f"[setup] Binding '{_ALIAS}' exists but credential resolution failed.")
-        print(f"        Run: leafhub status")
-        sys.exit(1)
-
-    # Attempt auto-bind to first available provider
-    prov_out = subprocess.run(
-        [leafhub_bin, "provider", "list"],
-        capture_output=True, text=True,
-    )
-    provider = next(
-        (line.strip().split()[0]
-         for line in prov_out.stdout.splitlines()
-         if line.strip() and not line.strip().startswith(("─", "Label", "Provider"))),
-        None,
-    )
-    if not provider:
-        print("[setup] No providers in vault. Run: leafhub manage")
-        sys.exit(1)
-
-    bind = subprocess.run(
-        [leafhub_bin, "project", "bind", project,
-         "--alias", _ALIAS, "--provider", provider],
-        capture_output=True, text=True,
-    )
-    if bind.returncode == 0:
-        print(f"[setup] Bound '{_ALIAS}' → '{provider}'. Run `leafscan setup` to verify.")
-    else:
-        print(f"[setup] Auto-bind failed:\n{bind.stderr}")
-        sys.exit(1)
+    print("[setup] Registration completed but credentials could not be verified.")
+    print("        Run: leafhub status")
