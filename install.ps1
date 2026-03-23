@@ -27,6 +27,10 @@ function Write-Ok($msg)   { Write-Host "${GREEN}+${NC}  $msg" }
 function Write-Info($msg) { Write-Host "${MUTED}.${NC}  $msg" }
 function Write-Fail($msg) { Write-Host "${RED}x${NC}  $msg"; exit 1 }
 
+function Assert-ExitCode($msg) {
+    if ($LASTEXITCODE -ne 0) { Write-Fail "$msg (exit code $LASTEXITCODE)" }
+}
+
 function Test-DirHasEntries([string]$Dir) {
     if (-not (Test-Path $Dir -PathType Container)) { return $false }
     return $null -ne (Get-ChildItem -Force -LiteralPath $Dir | Select-Object -First 1)
@@ -75,10 +79,17 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 if (Test-Path (Join-Path $InstallDir ".git")) {
     Write-Info "Existing installation found -- updating..."
     git -C $InstallDir pull --ff-only --quiet
+    Assert-ExitCode "git pull failed"
     Write-Ok "Updated."
 } else {
+    # Clean up leftover directory without .git (e.g. from a failed install)
+    if ((Test-Path $InstallDir -PathType Container) -and (Test-DirHasEntries $InstallDir)) {
+        Write-Info "Removing incomplete previous install at $InstallDir ..."
+        Remove-Item -Recurse -Force $InstallDir
+    }
     Write-Info "Cloning into $InstallDir ..."
     git clone --depth=1 $RepoUrl $InstallDir --quiet
+    Assert-ExitCode "git clone failed"
     Write-Ok "Cloned."
 }
 
@@ -117,6 +128,7 @@ $ScriptsDir = Join-Path $VenvDir "Scripts"
 if (-not (Test-Path $VenvPython)) {
     Write-Info "Creating .venv ..."
     & $Python -m venv $VenvDir
+    Assert-ExitCode "Failed to create virtual environment"
     Write-Ok "Venv created."
 } else {
     Write-Ok "Venv exists -- reusing."
@@ -124,13 +136,16 @@ if (-not (Test-Path $VenvPython)) {
 
 Write-Info "Upgrading pip ..."
 & $VenvPython -m pip install --upgrade pip --quiet
+Assert-ExitCode "pip upgrade failed"
 
 Write-Info "Installing leafscan[leafhub] ..."
 & $VenvPip install -e "$InstallDir[leafhub]" --quiet
+Assert-ExitCode "Package install failed"
 Write-Ok "Package installed."
 
 Write-Info "Installing Playwright + Chromium ..."
 & $VenvPython -m playwright install chromium
+Assert-ExitCode "Playwright install failed"
 Write-Ok "Playwright ready."
 
 # -- PATH ----------------------------------------------------------------------
