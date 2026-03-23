@@ -276,27 +276,77 @@ unset _lh_content
 leafhub_setup_project "$PROJECT_NAME" "$SCRIPT_DIR" "$LEAFHUB_ALIAS" \
     || fail "LeafHub registration failed.\n  Install LeafHub and retry: https://github.com/Rebas9512/Leafhub"
 
-ok "LeafHub integration complete."
+# If no providers yet and interactive, guide user through provider setup.
+# leafhub register skips this in curl|bash (stdin not a tty), so we handle it here.
+if [[ "$HEADLESS" != "true" ]] && [[ -t 0 || -e /dev/tty ]]; then
+    _has_providers=false
+    if "$LEAFHUB_BIN" provider list >/dev/null 2>&1; then
+        _prov_count=$("$LEAFHUB_BIN" provider list 2>/dev/null | grep -c '\S' || true)
+        [[ "$_prov_count" -gt 1 ]] && _has_providers=true
+    fi
 
-# ── CUSTOMIZE: project-specific steps ────────────────────────────────────────
-# Add steps here: model downloads, database setup, config generation, etc.
-# Example:
-#   section "Step 6 / 6  —  Download models"
-#   "$PROJECT_BIN" setup
-# ─────────────────────────────────────────────────────────────────────────────
+    if [[ "$_has_providers" == "false" ]]; then
+        echo ""
+        echo -e "  ${BOLD}$PROJECT_NAME needs an AI provider to work.${NC}"
+        echo -e "  ${MUTED}LeafHub stores API keys encrypted locally -- nothing leaves your system.${NC}"
+        echo ""
+        echo "  How would you like to configure your provider?"
+        echo -e "    ${GREEN}[1]${NC} Launch Web UI   -- visual setup at http://localhost:8765  (recommended)"
+        echo -e "    ${GREEN}[2]${NC} Terminal        -- step-by-step CLI prompts"
+        echo -e "    ${GREEN}[s]${NC} Skip            -- configure later with: $PROJECT_NAME setup"
+        echo ""
+        printf "  Choice [1]: "
+        IFS= read -r _choice < /dev/tty 2>/dev/null || _choice="s"
+        _choice="${_choice:-1}"
+
+        if [[ "$_choice" == "1" ]]; then
+            info "Starting LeafHub Web UI..."
+            "$LEAFHUB_BIN" manage --no-browser &
+            _manage_pid=$!
+            sleep 3
+            # Open browser (macOS: open, Linux: xdg-open, WSL: wslview)
+            if command -v open >/dev/null 2>&1; then open "http://localhost:8765"
+            elif command -v xdg-open >/dev/null 2>&1; then xdg-open "http://localhost:8765"
+            elif command -v wslview >/dev/null 2>&1; then wslview "http://localhost:8765"
+            fi
+            echo ""
+            echo -e "  ${GREEN}Web UI opened at http://localhost:8765${NC}"
+            echo "  Add a provider, then come back here."
+            printf "\n  Press Enter when done... "
+            IFS= read -r _ < /dev/tty 2>/dev/null || true
+            kill "$_manage_pid" 2>/dev/null || true
+            wait "$_manage_pid" 2>/dev/null || true
+            # Re-register to bind provider
+            "$LEAFHUB_BIN" register "$PROJECT_NAME" --path "$SCRIPT_DIR" \
+                --alias "$LEAFHUB_ALIAS" --headless 2>/dev/null || true
+        elif [[ "$_choice" == "2" ]]; then
+            "$LEAFHUB_BIN" provider add < /dev/tty
+            if [[ $? -eq 0 ]]; then
+                "$LEAFHUB_BIN" register "$PROJECT_NAME" --path "$SCRIPT_DIR" \
+                    --alias "$LEAFHUB_ALIAS" --headless 2>/dev/null || true
+            fi
+        else
+            echo -e "  ${MUTED}Skipped. Run '$PROJECT_NAME setup' later to configure.${NC}"
+        fi
+    fi
+fi
+
+ok "LeafHub integration complete."
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}  Setup complete!${NC}"
 echo ""
 if path_has_dir "$ORIGINAL_PATH" "$BIN_DIR"; then
-    echo -e "  ${GREEN}$PROJECT_NAME run${NC}"
+    echo -e "  ${GREEN}$PROJECT_NAME --help${NC}       # verify install"
+    echo -e "  ${GREEN}$PROJECT_NAME scan <url>${NC}   # scan a webpage"
+    echo -e "  ${GREEN}$PROJECT_NAME setup${NC}        # configure LeafHub"
 elif [[ "$PATH_PERSISTED" -eq 1 ]]; then
     echo "  Open a new terminal, then:"
-    echo -e "    ${GREEN}$PROJECT_NAME run${NC}"
+    echo -e "    ${GREEN}$PROJECT_NAME scan <url>${NC}"
 else
     echo "  Add ~/.local/bin to PATH, then:"
     echo -e "    ${GREEN}export PATH=\"\$HOME/.local/bin:\$PATH\"${NC}"
-    echo -e "    ${GREEN}$PROJECT_NAME run${NC}"
+    echo -e "    ${GREEN}$PROJECT_NAME scan <url>${NC}"
 fi
 echo ""
