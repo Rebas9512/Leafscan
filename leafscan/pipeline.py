@@ -80,7 +80,11 @@ def run(url: str, alias: str = "llm", *, pdf: bool = True) -> Path:
     # ── PDF generation ──────────────────────────────────────────────────────
     if pdf:
         print("[leafscan] Generating PDF ...", flush=True)
-        pdf_path = md_to_pdf(report_final, output_dir / "report.pdf")
+        pdf_path = md_to_pdf(
+            report_final,
+            output_dir / "report.pdf",
+            screenshot_paths=result.screenshot_paths,
+        )
         print(f"[leafscan] PDF saved -> {pdf_path}", flush=True)
 
     print(f"\n[leafscan] Done in {elapsed:.1f}s -> {report_path}", flush=True)

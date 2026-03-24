@@ -2,25 +2,35 @@
 Markdown-to-PDF converter for LeafScan reports.
 
 Uses the `markdown` library to render Markdown → HTML, then `weasyprint`
-to produce a professionally styled PDF.
+to produce a professionally styled PDF.  Optionally embeds page screenshots
+at section breaks for visual context.
 
 Usage:
     from .pdf import md_to_pdf
     pdf_path = md_to_pdf(report_md, output_dir / "report.pdf")
+    pdf_path = md_to_pdf(report_md, out, screenshot_paths=frames)
 """
 from __future__ import annotations
 
+import base64
+import re
 from pathlib import Path
 
 import markdown
-from weasyprint import HTML
 
 
-def md_to_pdf(md_text: str, output_path: Path) -> Path:
+def md_to_pdf(
+    md_text: str,
+    output_path: Path,
+    screenshot_paths: list[Path] | None = None,
+) -> Path:
     """
     Convert a Markdown string to a styled PDF file.
-    Returns the output Path.
+    If *screenshot_paths* is provided, up to 3 page screenshots are embedded
+    at evenly-spaced section breaks.  Returns the output Path.
     """
+    from weasyprint import HTML
+
     html_body = markdown.markdown(
         md_text,
         extensions=["tables", "fenced_code", "codehilite", "toc"],
@@ -29,9 +39,110 @@ def md_to_pdf(md_text: str, output_path: Path) -> Path:
         },
     )
 
+    if screenshot_paths:
+        html_body = _inject_screenshots(html_body, screenshot_paths)
+
     full_html = _wrap_html(html_body)
     HTML(string=full_html).write_pdf(str(output_path))
     return output_path
+
+
+# ── Screenshot injection ──────────────────────────────────────────────────────
+
+def _inject_screenshots(
+    html_body: str,
+    screenshot_paths: list[Path],
+    max_images: int = 3,
+) -> str:
+    """
+    Insert evenly-spaced screenshot <figure> blocks into the HTML at
+    section breaks.  Model-agnostic — runs after the LLM has already
+    produced its Markdown.
+
+    Looks for the best heading level to split on: tries <h2> first, then
+    falls back to <h3> (some models use ### for top-level report sections).
+    """
+    sampled = _sample_screenshots(screenshot_paths, max_images)
+    if not sampled:
+        return html_body
+
+    labels  = _frame_labels(len(sampled))
+    figures = []
+    for path, label in zip(sampled, labels):
+        b64 = base64.standard_b64encode(path.read_bytes()).decode()
+        figures.append(
+            f'<figure class="screenshot">'
+            f'<img src="data:image/png;base64,{b64}" alt="{label}">'
+            f'<figcaption>{label}</figcaption>'
+            f'</figure>'
+        )
+
+    # Find heading positions — try h2 first, fall back to h3
+    heading_positions = _find_section_breaks(html_body)
+
+    if len(heading_positions) < 2:
+        # Too few sections — append all screenshots at the end
+        return html_body + "\n" + "\n".join(figures)
+
+    # Skip the first heading (don't break up the intro) and distribute
+    # figures evenly among the remaining section boundaries.
+    candidates = heading_positions[1:]
+    n_figs  = len(figures)
+    n_slots = len(candidates)
+
+    if n_slots <= n_figs:
+        chosen = list(range(n_slots))
+    else:
+        chosen = [
+            round(i * (n_slots - 1) / max(n_figs - 1, 1))
+            for i in range(n_figs)
+        ]
+
+    # Insert in reverse order so earlier positions stay valid
+    for fig_idx, slot_idx in reversed(list(enumerate(chosen))):
+        pos = candidates[slot_idx]
+        html_body = html_body[:pos] + figures[fig_idx] + "\n" + html_body[pos:]
+
+    return html_body
+
+
+def _find_section_breaks(html: str) -> list[int]:
+    """
+    Return character positions of top-level section headings.
+    Prefers <h2> tags; falls back to <h3> if fewer than 2 h2s exist.
+    This handles the common case where different LLMs use different
+    heading levels for their report structure.
+    """
+    h2 = [m.start() for m in re.finditer(r"<h2[\s>]", html)]
+    if len(h2) >= 2:
+        return h2
+    h3 = [m.start() for m in re.finditer(r"<h3[\s>]", html)]
+    if len(h3) >= 2:
+        return h3
+    # Last resort: merge whatever we found
+    return sorted(h2 + h3)
+
+
+def _sample_screenshots(paths: list[Path], n: int = 3) -> list[Path]:
+    """Pick *n* evenly-spaced frames — always includes first and last."""
+    if not paths:
+        return []
+    if len(paths) <= n:
+        return list(paths)
+    indices: set[int] = set()
+    for i in range(n):
+        indices.add(round(i * (len(paths) - 1) / (n - 1)))
+    return [paths[i] for i in sorted(indices)]
+
+
+def _frame_labels(count: int) -> list[str]:
+    if count == 1:
+        return ["Page screenshot"]
+    if count == 2:
+        return ["Top of page", "Bottom of page"]
+    if count == 3:
+        return ["Top of page", "Mid-page", "Bottom of page"]
+    return [f"Screenshot {i + 1} of {count}" for i in range(count)]
 
 
 # ── HTML template with print-optimised CSS ────────────────────────────────────
@@ -209,5 +320,26 @@ strong {
 a {
     color: #2563eb;
     text-decoration: none;
+}
+
+/* ── Screenshots ───────────────────────────────────────────────────── */
+figure.screenshot {
+    text-align: center;
+    margin: 1.8em 0;
+    page-break-inside: avoid;
+}
+
+figure.screenshot img {
+    max-width: 100%;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+figure.screenshot figcaption {
+    font-size: 9pt;
+    color: #888;
+    margin-top: 0.4em;
+    font-style: italic;
 }
 """
