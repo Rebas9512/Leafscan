@@ -37,11 +37,12 @@ jobs:
         run: python -m playwright install chromium
 
       - name: Verify leafhub.toml
-        run: python -c "
-          import tomllib
-          m = tomllib.loads(open('leafhub.toml').read())
-          assert m['project']['name'] == 'leafscan'
-          assert m['bindings'][0]['alias'] == 'llm'
+        run: |
+          python -c "
+          import tomllib, pathlib
+          m = tomllib.loads(pathlib.Path('leafhub.toml').read_text())
+          assert m['project']['name'] == 'leafscan', f'name mismatch: {m[\"project\"][\"name\"]}'
+          assert m['bindings'][0]['alias'] == 'llm', 'alias mismatch'
           print('leafhub.toml: valid')
           "
 
