@@ -15,7 +15,18 @@ import sys
 from pathlib import Path
 
 _ROOT  = Path(__file__).resolve().parent.parent
-_ALIAS = "llm"
+
+
+def _get_default_alias() -> str:
+    """Read the primary alias from leafhub.toml, fall back to 'llm'."""
+    try:
+        from leafhub_sdk.manifest import get_default_alias
+        return get_default_alias(project_dir=_ROOT, fallback="llm")
+    except ImportError:
+        pass
+    return "llm"
+
+_ALIAS = _get_default_alias()
 
 
 # ── Entry point ────────────────────────────────────────────────────────────────
@@ -30,8 +41,8 @@ def main() -> None:
     # scan
     scan_p = sub.add_parser("scan", help="Scan a URL and generate a design report")
     scan_p.add_argument("url", help="Public URL to analyse")
-    scan_p.add_argument("--alias", default="llm",
-                        help="Leafhub alias to use (default: llm)")
+    scan_p.add_argument("--alias", default=_ALIAS,
+                        help=f"Leafhub alias to use (default: {_ALIAS})")
     scan_p.add_argument("--no-pdf", action="store_true",
                         help="Skip PDF generation (only produce report.md)")
 
@@ -153,18 +164,26 @@ def _cmd_setup() -> None:
       4. Verify credentials resolve after registration
     """
     # ── Fast path: probe credentials ──────────────────────────────────────
-    for _mod in ("leafhub.probe", "leafhub_dist.probe"):
-        try:
-            import importlib
-            detect = importlib.import_module(_mod).detect
-            result = detect()
-            if result.ready:
-                hub = result.open_sdk()
-                hub.get_key(_ALIAS)
-                print(f"[setup] OK -- credentials resolve via LeafHub (alias: {_ALIAS!r})")
-                return
-        except Exception:
-            continue
+    try:
+        from leafhub_sdk import resolve as _sdk_resolve
+        _sdk_resolve(_ALIAS, project_dir=_ROOT)
+        print(f"[setup] OK -- credentials resolve (alias: {_ALIAS!r})")
+        return
+    except ImportError:
+        pass
+    except Exception:
+        pass
+    # Fallback: try leafhub.probe directly
+    try:
+        from leafhub.probe import detect
+        result = detect(project_dir=_ROOT)
+        if result.ready:
+            hub = result.open_sdk()
+            hub.get_key(_ALIAS)
+            print(f"[setup] OK -- credentials resolve via LeafHub (alias: {_ALIAS!r})")
+            return
+    except Exception:
+        pass
 
     # ── Ensure leafhub is installed ───────────────────────────────────────
     leafhub_bin = _ensure_leafhub()
@@ -179,31 +198,41 @@ def _cmd_setup() -> None:
     print("        This will guide you through provider configuration.")
     print()
 
-    reg_cmd = [leafhub_bin, "register", "leafscan",
-               "--path", str(_ROOT), "--alias", _ALIAS]
+    # Use manifest mode if leafhub.toml exists, otherwise legacy
+    if (_ROOT / "leafhub.toml").is_file():
+        reg_cmd = [leafhub_bin, "register", str(_ROOT)]
+    else:
+        reg_cmd = [leafhub_bin, "register", "leafscan",
+                   "--path", str(_ROOT), "--alias", _ALIAS]
     result = subprocess.run(reg_cmd)
 
     if result.returncode != 0:
         print()
         print("[setup] Registration did not complete.")
-        print(f"        Retry: leafhub register leafscan --path \"{_ROOT}\" --alias {_ALIAS}")
+        print(f"        Retry: leafhub register .  (from {_ROOT})")
         sys.exit(1)
 
     # ── Verify credentials resolve ────────────────────────────────────────
     print()
-    for _mod in ("leafhub.probe", "leafhub_dist.probe"):
-        try:
-            import importlib
-            importlib.invalidate_caches()
-            detect = importlib.import_module(_mod).detect
-            res = detect()
-            if res.ready:
-                hub = res.open_sdk()
-                hub.get_key(_ALIAS)
-                print(f"[setup] OK -- credentials resolve via LeafHub (alias: {_ALIAS!r})")
-                return
-        except Exception:
-            continue
+    try:
+        from leafhub_sdk import resolve as _sdk_resolve
+        _sdk_resolve(_ALIAS, project_dir=_ROOT)
+        print(f"[setup] OK -- credentials resolve (alias: {_ALIAS!r})")
+        return
+    except Exception:
+        pass
+    try:
+        from leafhub.probe import detect
+        import importlib
+        importlib.invalidate_caches()
+        res = detect(project_dir=_ROOT)
+        if res.ready:
+            hub = res.open_sdk()
+            hub.get_key(_ALIAS)
+            print(f"[setup] OK -- credentials resolve via LeafHub (alias: {_ALIAS!r})")
+            return
+    except Exception:
+        pass
 
     print("[setup] Registration completed but credentials could not be verified.")
-    print("        Run: leafhub status")
+    print("        Run: leafhub doctor .")

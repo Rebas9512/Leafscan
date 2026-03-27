@@ -8,3 +8,12 @@ outputs/
 .env
 .pytest_cache/
 *.log
+
+# LeafHub credential token (never commit)
+.leafhub
+
+# Claude Code
+.claude/
+
+# OS
+.DS_Store

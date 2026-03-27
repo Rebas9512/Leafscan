@@ -36,6 +36,15 @@ jobs:
       - name: Install Playwright Chromium
         run: python -m playwright install chromium
 
+      - name: Verify leafhub.toml
+        run: python -c "
+          import tomllib
+          m = tomllib.loads(open('leafhub.toml').read())
+          assert m['project']['name'] == 'leafscan'
+          assert m['bindings'][0]['alias'] == 'llm'
+          print('leafhub.toml: valid')
+          "
+
       - name: Run unit tests
         run: python -m pytest tests/test_model.py tests/test_reporter.py tests/test_aggregator.py tests/test_extractor.py tests/test_pdf.py -v
 
@@ -50,7 +59,7 @@ jobs:
           python-version: "3.12"
 
       - name: Python syntax check
-        run: find . -name '*.py' -not -path './.venv/*' -not -path './leafhub_dist/*' | xargs python -m py_compile
+        run: find . -name '*.py' -not -path './.venv/*' | xargs python -m py_compile
 
       - name: Shell script syntax
         run: |

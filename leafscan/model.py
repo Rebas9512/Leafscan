@@ -12,11 +12,6 @@ from dataclasses import dataclass, field
 from enum import Flag, auto
 from pathlib import Path
 
-try:
-    from leafhub.probe import detect
-except ImportError:
-    from leafhub_dist.probe import detect  # type: ignore[no-redef]
-
 
 # ── Capability flags ───────────────────────────────────────────────────────────
 
@@ -25,8 +20,8 @@ class Cap(Flag):
     VISION = auto()
 
 
-# Minimal 8×8 red PNG — used only for the capability probe request.
-# Some endpoints (e.g. Codex) reject 1×1 images as invalid; 8×8 is universally accepted.
+# Minimal 8x8 red PNG — used only for the capability probe request.
+# Some endpoints (e.g. Codex) reject 1x1 images as invalid; 8x8 is universally accepted.
 _PROBE_PNG_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR4nGP4z8CA"
     "FWEXHbQSACj/P8Fu7N9hAAAAAElFTkSuQmCC"
@@ -48,19 +43,57 @@ class ResolvedModel:
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
-def resolve(alias: str = "llm") -> ResolvedModel:
-    """
-    Resolve model client from Leafhub vault. Falls back to env vars if Leafhub
-    is unavailable (CI / standalone usage). Caps are NOT determined here.
-    """
-    # Pass the project root so detect() finds .leafhub regardless of CWD.
-    result = detect(project_dir=_PROJECT_ROOT)
-    if result.ready:
-        hub    = result.open_sdk()
-        cfg    = hub.get_config(alias)
-        client = _build_client(hub, cfg, alias)
-        return ResolvedModel(client=client, api_format=cfg.api_format, model=cfg.model)
+def _get_default_alias() -> str:
+    """Read the primary alias from leafhub.toml, fall back to 'llm'."""
+    try:
+        from leafhub_sdk.manifest import get_default_alias
+        return get_default_alias(project_dir=_PROJECT_ROOT, fallback="llm")
+    except ImportError:
+        pass
+    return "llm"
 
+
+def resolve(alias: str | None = None) -> ResolvedModel:
+    """
+    Resolve model client. Tries leafhub-sdk first, then direct leafhub probe,
+    then env vars. Caps are NOT determined here — call probe_caps() after.
+    """
+    if alias is None:
+        alias = _get_default_alias()
+
+    # ── Strategy 1: leafhub-sdk unified resolve ──────────────────────────────
+    try:
+        from leafhub_sdk import resolve as lh_resolve
+
+        cred = lh_resolve(alias, project_dir=_PROJECT_ROOT, as_client=True)
+        return ResolvedModel(
+            client=cred.client,
+            api_format=cred.api_format,
+            model=cred.model,
+        )
+    except ImportError:
+        pass  # leafhub-sdk not installed — try legacy path
+    except Exception:
+        pass  # resolve failed — fall through
+
+    # ── Strategy 2: legacy leafhub probe ─────────────────────────────────────
+    try:
+        from leafhub.probe import detect
+
+        result = detect(project_dir=_PROJECT_ROOT)
+        if result.ready:
+            hub = result.open_sdk()
+            cfg = hub.get_config(alias)
+            client = _build_client_legacy(hub, cfg, alias)
+            return ResolvedModel(
+                client=client, api_format=cfg.api_format, model=cfg.model,
+            )
+    except ImportError:
+        pass
+    except Exception:
+        pass
+
+    # ── Strategy 3: env var fallback ─────────────────────────────────────────
     return _fallback_from_env()
 
 
@@ -129,16 +162,14 @@ def probe_caps(m: ResolvedModel) -> Cap:
 
 # ── Internal helpers ───────────────────────────────────────────────────────────
 
-def _build_client(hub, cfg, alias: str):
+def _build_client_legacy(hub, cfg, alias: str):
+    """Build client from legacy LeafHub SDK (when leafhub-sdk is not available)."""
     fmt = cfg.api_format
     if fmt == "anthropic-messages":
         return hub.anthropic(alias)
     if fmt in ("openai-completions", "ollama"):
         return hub.openai(alias)
     if fmt == "openai-responses":
-        # OpenAI SDK appends /responses to base_url for responses.create().
-        # Leafhub's Codex base_url already includes /responses — strip it
-        # to avoid hitting .../responses/responses (→ 403).
         from openai import OpenAI
         base = cfg.base_url.rstrip("/")
         if base.endswith("/responses"):
@@ -164,5 +195,6 @@ def _fallback_from_env() -> ResolvedModel:
         )
     raise RuntimeError(
         "No credentials found.\n"
-        "Run ./setup.sh, or set ANTHROPIC_API_KEY / OPENAI_API_KEY."
+        "Run:  leafhub register .   (if leafhub.toml exists)\n"
+        "Or set ANTHROPIC_API_KEY / OPENAI_API_KEY."
     )

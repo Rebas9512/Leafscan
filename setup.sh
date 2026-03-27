@@ -244,7 +244,7 @@ section "Step 5 / 5  —  LeafHub"
 # Load register.sh — provides leafhub_setup_project().
 # Resolution order:
 #   1. leafhub shell-helper     — system PATH binary (fast, offline)
-#   2. leafhub_dist/register.sh — local distributed copy (offline fallback)
+#   2. venv-installed leafhub   — pip dependency fallback
 #   3. GitHub curl              — first-time bootstrap, network required
 _lh_content=""
 if _lh_content="$(leafhub shell-helper 2>/dev/null)" && [[ -n "$_lh_content" ]]; then
@@ -253,9 +253,6 @@ elif [[ -x "$VENV_DIR/bin/leafhub" ]] \
     && _lh_content="$("$VENV_DIR/bin/leafhub" shell-helper 2>/dev/null)" \
     && [[ -n "$_lh_content" ]]; then
     eval "$_lh_content"
-elif [[ -f "$SCRIPT_DIR/leafhub_dist/register.sh" ]]; then
-    # shellcheck disable=SC1091
-    source "$SCRIPT_DIR/leafhub_dist/register.sh"
 else
     info "Fetching LeafHub installer ..."
     _TMP_REG="$(mktemp)"

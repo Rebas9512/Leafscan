@@ -464,7 +464,7 @@ Leafscan/
 │   └── test_pdf.py       # PDF converter tests
 │
 ├── outputs/              # Generated reports (git-ignored)
-├── leafhub_dist/         # LeafHub integration module (auto-generated)
+├── leafhub.toml          # LeafHub project manifest (alias, fallbacks)
 ├── pyproject.toml
 ├── setup.sh
 └── install.sh / install.ps1 / install.cmd
